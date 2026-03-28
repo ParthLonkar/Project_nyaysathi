@@ -42,36 +42,54 @@ export default function PortalSelection() {
   return (
     <div className="bg-surface text-on-surface min-h-screen flex flex-col">
       {/* Navigation Bar */}
-      <nav className="w-full border-b border-outline-variant/15 bg-surface-bright shadow-[0_2px_8px_rgba(25,28,29,0.04)]">
+      <nav className="w-full border-b border-outline-variant/15 bg-surface-bright shadow-[0_2px_8px_rgba(25,28,29,0.04)] sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           {/* Logo and Brand */}
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
+          <div
+            className="flex items-center space-x-2 cursor-pointer hover:opacity-75 transition-opacity"
+            onClick={() => navigate('/')}
+          >
             <span
-              className="material-symbols-outlined text-primary text-4xl"
+              className="material-symbols-outlined text-primary text-3xl"
               style={{ fontVariationSettings: "'FILL' 0" }}>
               account_balance
             </span>
-            <h1 className="font-headline font-black text-2xl tracking-tighter text-primary hidden sm:block">
+            <h1 className="font-headline font-black text-xl tracking-tighter text-primary hidden sm:block">
               NyaySathi
             </h1>
           </div>
 
           {/* Nav Links */}
-          <div className="flex items-center space-x-8">
-            <button onClick={() => navigate('/')} className="font-body font-medium text-on-surface hover:text-primary transition-colors text-sm bg-none border-none cursor-pointer p-0">
+          <div className="hidden md:flex items-center space-x-8">
+            <button
+              onClick={() => navigate('/')}
+              className="font-body font-medium text-on-surface hover:text-primary transition-colors text-sm bg-none border-none cursor-pointer p-0"
+            >
               Home
             </button>
-            <a href="/" className="font-body font-medium text-on-surface hover:text-primary transition-colors text-sm">
-              Track
-            </a>
+            <button
+              onClick={() => {
+                const id = prompt('Enter your Complaint Reference ID:');
+                if (id) navigate(`/track/${encodeURIComponent(id.trim())}`);
+              }}
+              className="font-body font-medium text-on-surface hover:text-primary transition-colors text-sm bg-none border-none cursor-pointer p-0"
+            >
+              Track Complaint
+            </button>
           </div>
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-3">
-            <button className="px-4 py-2 text-sm font-semibold text-primary border-2 border-primary rounded-lg hover:bg-primary hover:text-on-primary transition-all duration-200">
+            <button
+              onClick={() => navigate('/login')}
+              className="hidden lg:block px-4 py-2 text-sm font-semibold text-primary border-2 border-primary rounded-lg hover:bg-primary hover:text-on-primary transition-all duration-200"
+            >
               Login
             </button>
-            <button className="px-4 py-2 text-sm font-bold text-on-primary bg-primary rounded-lg hover:shadow-lg hover:shadow-primary/40 transition-all duration-200">
+            <button
+              onClick={() => navigate('/submit')}
+              className="px-4 py-2 text-sm font-bold text-on-primary bg-primary rounded-lg hover:shadow-lg hover:shadow-primary/40 transition-all duration-200"
+            >
               File Complaint
             </button>
           </div>

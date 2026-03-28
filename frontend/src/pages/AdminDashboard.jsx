@@ -394,9 +394,9 @@ export default function AdminDashboard() {
                       <div className="flex-1 min-w-0">
                         <p className="font-headline text-xs font-bold text-on-surface truncate">{admin?.staff_name || 'Admin User'}</p>
                         <p className="text-[9px] text-secondary mt-0.5">{admin?.position || 'Administrator'}</p>
-                        <div className="mt-1.5 inline-flex items-center space-x-1 bg-tertiary-container px-1.5 py-0.5 rounded-full">
-                          <span className="material-symbols-outlined text-[12px] text-tertiary">verified_user</span>
-                          <span className="text-[8px] font-semibold text-tertiary">Verified</span>
+                        <div className="mt-2 inline-flex items-center space-x-1.5 bg-green-100 px-2.5 py-1 rounded-lg border border-green-300 shadow-sm">
+                          <span className="material-symbols-outlined text-[13px] text-green-700" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
+                          <span className="text-[8px] font-bold text-green-700">Admin Verified</span>
                         </div>
                       </div>
                     </div>
