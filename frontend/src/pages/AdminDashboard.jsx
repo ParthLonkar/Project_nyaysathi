@@ -206,7 +206,58 @@ export default function AdminDashboard() {
       default: return 'bg-slate-100 text-slate-600';
     }
   };
+  const totalComplaints = Number(summary?.total_complaints || 0);
+  const resolvedCount = Number(summary?.resolved || 0);
+  const pendingCount = Number(summary?.pending || 0);
+  const inProgressCount = Number(summary?.in_progress || 0);
 
+  const pct = (value, total) => {
+    if (!total) return 0;
+    return Math.max(0, Math.min(100, Math.round((value / total) * 100)));
+  };
+
+  const kpiCards = [
+    {
+      label: 'Total Complaints',
+      value: totalComplaints,
+      icon: 'description',
+      textColor: 'text-primary',
+      chipColor: 'text-primary bg-primary/10',
+      barColor: 'bg-primary',
+      progress: 100,
+      trendLabel: 'Live count',
+    },
+    {
+      label: 'Resolved Cases',
+      value: resolvedCount,
+      icon: 'check_circle',
+      textColor: 'text-tertiary',
+      chipColor: 'text-tertiary bg-tertiary/10',
+      barColor: 'bg-tertiary',
+      progress: pct(resolvedCount, totalComplaints),
+      trendLabel: `${pct(resolvedCount, totalComplaints)}% of total`,
+    },
+    {
+      label: 'Pending Review',
+      value: pendingCount,
+      icon: 'pending_actions',
+      textColor: 'text-secondary',
+      chipColor: 'text-secondary bg-secondary/10',
+      barColor: 'bg-secondary',
+      progress: pct(pendingCount, totalComplaints),
+      trendLabel: `${pct(pendingCount, totalComplaints)}% of total`,
+    },
+    {
+      label: 'In Progress',
+      value: inProgressCount,
+      icon: 'priority_high',
+      textColor: 'text-error',
+      chipColor: 'text-error bg-error/10',
+      barColor: 'bg-error',
+      progress: pct(inProgressCount, totalComplaints),
+      trendLabel: `${pct(inProgressCount, totalComplaints)}% of total`,
+    },
+  ];
   return (
     <div className="bg-surface text-on-surface min-h-screen flex">
       {/* Sidebar */}
@@ -335,75 +386,26 @@ export default function AdminDashboard() {
                   {/* Analytics Grid */}
                   {summary && (
                     <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                      {/* Total Complaints */}
-                      <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group border border-slate-100">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="p-3 bg-primary/5 rounded-xl text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                        <span className="material-symbols-outlined">description</span>
-                      </div>
-                      <div className="flex items-center text-tertiary font-bold text-xs bg-secondary-container/30 px-2 py-1 rounded-full">
-                        <span className="material-symbols-outlined text-xs mr-1">trending_up</span> +12%
-                      </div>
-                    </div>
-                    <h3 className="text-slate-500 text-sm font-semibold mb-1">Total Complaints</h3>
-                    <p className="text-3xl font-headline font-bold text-on-surface">{summary.total_complaints || 0}</p>
-                    <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-primary w-3/4"></div>
-                    </div>
-                  </div>
-
-                  {/* Resolved */}
-                  <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group border border-slate-100">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="p-3 bg-tertiary/5 rounded-xl text-tertiary group-hover:bg-tertiary group-hover:text-white transition-colors">
-                        <span className="material-symbols-outlined">check_circle</span>
-                      </div>
-                      <div className="flex items-center text-tertiary font-bold text-xs bg-secondary-container/30 px-2 py-1 rounded-full">
-                        <span className="material-symbols-outlined text-xs mr-1">trending_up</span> +5.4%
-                      </div>
-                    </div>
-                    <h3 className="text-slate-500 text-sm font-semibold mb-1">Resolved Cases</h3>
-                    <p className="text-3xl font-headline font-bold text-on-surface">{summary.resolved || 0}</p>
-                    <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-tertiary w-[64%]"></div>
-                    </div>
-                  </div>
-
-                  {/* Pending */}
-                  <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group border border-slate-100">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="p-3 bg-secondary/5 rounded-xl text-secondary group-hover:bg-secondary group-hover:text-white transition-colors">
-                        <span className="material-symbols-outlined">pending_actions</span>
-                      </div>
-                      <div className="flex items-center text-error font-bold text-xs bg-error-container/30 px-2 py-1 rounded-full">
-                        <span className="material-symbols-outlined text-xs mr-1">trending_down</span> -2%
-                      </div>
-                    </div>
-                    <h3 className="text-slate-500 text-sm font-semibold mb-1">Pending Review</h3>
-                    <p className="text-3xl font-headline font-bold text-on-surface">{summary.pending || 0}</p>
-                    <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-secondary w-[22%]"></div>
-                    </div>
-                  </div>
-
-                  {/* In Progress */}
-                  <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group border border-slate-100">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="p-3 bg-error/5 rounded-xl text-error group-hover:bg-error group-hover:text-white transition-colors">
-                        <span className="material-symbols-outlined">priority_high</span>
-                      </div>
-                      <div className="flex items-center text-error font-bold text-xs bg-error-container/30 px-2 py-1 rounded-full">
-                        <span className="material-symbols-outlined text-xs mr-1">trending_up</span> +8%
-                      </div>
-                    </div>
-                    <h3 className="text-slate-500 text-sm font-semibold mb-1">In Progress</h3>
-                    <p className="text-3xl font-headline font-bold text-on-surface">{summary.in_progress || 0}</p>
-                    <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-error w-[8%]"></div>
-                    </div>
-                  </div>
-                </section>
-              )}
+                      {kpiCards.map((card) => (
+                        <div key={card.label} className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm hover:shadow-md transition-shadow group border border-slate-100">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className={`p-3 rounded-xl ${card.textColor} bg-slate-100 group-hover:bg-white transition-colors`}>
+                              <span className="material-symbols-outlined">{card.icon}</span>
+                            </div>
+                            <div className={`flex items-center font-bold text-xs px-2 py-1 rounded-full ${card.chipColor}`}>
+                              <span className="material-symbols-outlined text-xs mr-1">insights</span>
+                              {card.trendLabel}
+                            </div>
+                          </div>
+                          <h3 className="text-slate-500 text-sm font-semibold mb-1">{card.label}</h3>
+                          <p className="text-3xl font-headline font-bold text-on-surface">{card.value}</p>
+                          <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${card.barColor}`} style={{ width: `${card.progress}%` }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </section>
+                  )}
 
               {/* Complaints Table */}
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
@@ -497,7 +499,6 @@ export default function AdminDashboard() {
                       <span className="material-symbols-outlined text-sm">chevron_left</span>
                     </button>
                     <button className="w-8 h-8 flex items-center justify-center rounded bg-primary text-white text-xs font-bold">1</button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold">2</button>
                     <button className="w-8 h-8 flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 transition-colors">
                       <span className="material-symbols-outlined text-sm">chevron_right</span>
                     </button>
@@ -1043,3 +1044,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
+
+

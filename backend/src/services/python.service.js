@@ -55,6 +55,11 @@ const normalizeAIResult = (aiData, sourceText = '', sourceLocation = '') => {
     rti_draft: aiData?.rti_draft || '',
     document_valid: aiData?.document_valid === true,
     document_notes: aiData?.document_notes || '',
+    legal_analysis: aiData?.legal_analysis || {},
+    compliance_check: aiData?.compliance_check || {},
+    priority_score: typeof aiData?.priority_score === 'number' ? aiData.priority_score : null,
+    escalation_needed: aiData?.escalation_needed === true,
+    agent_flow: aiData?.agent_flow || {},
   };
 };
 
@@ -169,3 +174,4 @@ export const pythonService = {
     }
   }
 };
+
