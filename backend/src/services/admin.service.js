@@ -336,4 +336,167 @@ export const adminService = {
       return { success: false, error: 'Failed to fetch performance' };
     }
   },
+
+  getDailyReport: async (departmentId, reportDate) => {
+    try {
+      logger.info(`Generating daily report for date: ${reportDate}`);
+
+      // Parse the date to get start and end of day
+      const startOfDay = new Date(reportDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(reportDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const startIso = startOfDay.toISOString();
+      const endIso = endOfDay.toISOString();
+
+      // Fetch complaints with error handling
+      let allComplaints = [];
+      
+      try {
+        const { data, error } = await supabase
+          .from('complaints')
+          .select('id, title, description, category, status, priority, created_at, updated_at, resolved_at, assigned_staff_id, ai_analysis')
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          allComplaints = data;
+        } else {
+          logger.warn('Complaints fetch error:', error?.message);
+          allComplaints = [];
+        }
+      } catch (err) {
+        logger.error('Exception fetching complaints:', err);
+        allComplaints = [];
+      }
+
+      // Filter complaints for the specific day
+      const dailyComplaints = (allComplaints || []).filter(complaint => {
+        try {
+          if (!complaint.created_at) return false;
+          const complaintDate = new Date(complaint.created_at);
+          return complaintDate >= startOfDay && complaintDate <= endOfDay;
+        } catch (e) {
+          return false;
+        }
+      });
+
+      logger.info(`Found ${dailyComplaints.length} complaints for the day`);
+
+      // Build staff map (try to fetch but don't fail if unavailable)
+      const staffMap = {};
+      try {
+        const { data: staffList, error: staffError } = await supabase
+          .from('department_staff')
+          .select('id, staff_name, position, email, phone');
+
+        if (!staffError && staffList && Array.isArray(staffList)) {
+          staffList.forEach(staff => {
+            if (staff && staff.id) {
+              staffMap[staff.id] = staff;
+            }
+          });
+        }
+      } catch (err) {
+        logger.warn('Staff fetch failed (non-blocking):', err.message);
+        // Continue without staff data
+      }
+
+      // Calculate statistics
+      const statusBreakdown = {};
+      const severityBreakdown = {};
+      const categoryBreakdown = {};
+      const assignedToStaff = {};
+      const escalatedComplaints = [];
+      let totalResolutionTime = 0;
+      let resolvedCount = 0;
+
+      dailyComplaints.forEach(complaint => {
+        try {
+          // Status breakdown
+          const status = String(complaint.status || 'new').toLowerCase();
+          statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+
+          // Priority/Severity breakdown
+          const priority = String(complaint.priority || 'medium').toLowerCase();
+          severityBreakdown[priority] = (severityBreakdown[priority] || 0) + 1;
+
+          // Category breakdown
+          const category = String(complaint.category || 'uncategorized');
+          categoryBreakdown[category] = (categoryBreakdown[category] || 0) + 1;
+
+          // Staff assignment
+          if (complaint.assigned_staff_id) {
+            assignedToStaff[complaint.assigned_staff_id] = (assignedToStaff[complaint.assigned_staff_id] || 0) + 1;
+          }
+
+          // Escalated complaints
+          const isEscalated = priority === 'high' || complaint.ai_analysis?.escalation_needed === true;
+          if (isEscalated) {
+            escalatedComplaints.push(complaint);
+          }
+
+          // Calculate average resolution time
+          if ((status === 'resolved' || status === 'closed') && complaint.resolved_at) {
+            const createdDate = new Date(complaint.created_at);
+            const resolvedDate = new Date(complaint.resolved_at);
+            const resolutionTime = (resolvedDate - createdDate) / (1000 * 60 * 60 * 24);
+            if (resolutionTime >= 0 && Number.isFinite(resolutionTime)) {
+              totalResolutionTime += resolutionTime;
+              resolvedCount++;
+            }
+          }
+        } catch (itemErr) {
+          logger.warn('Error processing complaint:', itemErr.message);
+        }
+      });
+
+      const avgResolutionTime = resolvedCount > 0 ? parseFloat((totalResolutionTime / resolvedCount).toFixed(2)) : 0;
+
+      const reportDateFormatted = reportDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+
+      const report = {
+        success: true,
+        report: {
+          reportDate: reportDateFormatted,
+          reportDateISO: reportDate.toISOString().split('T')[0],
+          totalComplaintsReceived: dailyComplaints.length,
+          statusBreakdown,
+          severityBreakdown,
+          categoryBreakdown,
+          staffAssignments: assignedToStaff,
+          staffDetails: staffMap,
+          escalatedComplaints: escalatedComplaints.slice(0, 20),
+          kpis: {
+            averageResolutionTime: avgResolutionTime,
+            totalResolved: resolvedCount,
+            slaComplianceRate: dailyComplaints.length > 0 ? Math.round((resolvedCount / dailyComplaints.length) * 100) : 0,
+          },
+          detailedComplaints: dailyComplaints.map(c => ({
+            id: c.id || 'N/A',
+            title: c.title || 'No Title',
+            description: String(c.description || 'N/A').substring(0, 100),
+            category: c.category || 'General',
+            status: c.status || 'pending',
+            priority: c.priority || 'medium',
+            createdAt: c.created_at ? new Date(c.created_at).toLocaleString() : 'Unknown',
+            assignedTo: staffMap[c.assigned_staff_id]?.staff_name || 'Unassigned',
+            assignedEmail: staffMap[c.assigned_staff_id]?.email || 'N/A',
+            actionTaken: Array.isArray(c.ai_analysis?.recommended_actions) ? c.ai_analysis.recommended_actions.join(', ') : 'Pending',
+          })).slice(0, 100),
+        },
+      };
+
+      logger.info('Daily report generated successfully');
+      return report;
+    } catch (error) {
+      logger.error('getDailyReport error:', error);
+      return { success: false, error: 'Failed to generate daily report: ' + error.message };
+    }
+  },
 };

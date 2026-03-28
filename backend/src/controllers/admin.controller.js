@@ -1,4 +1,5 @@
 import { adminService } from '../services/admin.service.js';
+import { pdfService } from '../services/pdf.service.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -226,6 +227,113 @@ export const adminController = {
     } catch (error) {
       logger.error('Get staff performance error:', error);
       return res.status(500).json({ error: 'Failed to get staff performance' });
+    }
+  },
+
+  /**
+   * Get daily report data
+   * GET /admin/daily-report?date=YYYY-MM-DD
+   */
+  getDailyReport: async (req, res) => {
+    try {
+      const { department_id, id: adminId } = req.user;
+      const { date } = req.query;
+
+      if (!department_id) {
+        return res.status(400).json({ error: 'Department ID required', success: false });
+      }
+
+      // Parse the date or use today
+      let reportDate = new Date();
+      if (date) {
+        const [year, month, day] = date.split('-').map(Number);
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+          return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD', success: false });
+        }
+        reportDate = new Date(year, month - 1, day);
+      }
+
+      logger.info(`Admin ${adminId} requesting daily report for ${reportDate.toISOString()}`);
+
+      const result = await adminService.getDailyReport(department_id, reportDate);
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('getDailyReport controller error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to get daily report: ' + error.message });
+    }
+  },
+
+  /**
+   * Generate and download daily report PDF
+   * GET /admin/daily-report/download?date=YYYY-MM-DD
+   */
+  downloadDailyReportPDF: async (req, res) => {
+    try {
+      const { id: adminId, department_id, staff_name, department_name } = req.user;
+      const { date } = req.query;
+
+      if (!department_id) {
+        return res.status(400).json({ error: 'Department ID required', success: false });
+      }
+
+      // Parse the date or use today
+      let reportDate = new Date();
+      if (date) {
+        const [year, month, day] = date.split('-').map(Number);
+        if (isNaN(year) || isNaN(month) || isNaN(day)) {
+          return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD', success: false });
+        }
+        reportDate = new Date(year, month - 1, day);
+      }
+
+      logger.info(`Admin ${adminId} requesting PDF download for ${reportDate.toISOString()}`);
+
+      // Get report data
+      const reportResult = await adminService.getDailyReport(department_id, reportDate);
+
+      if (!reportResult.success) {
+        logger.error('Failed to fetch report data:', reportResult.error);
+        return res.status(500).json(reportResult);
+      }
+
+      // Prepare data for PDF generation
+      const reportData = {
+        ...reportResult.report,
+        preparedBy: staff_name || 'Admin User',
+        department: department_name || 'Department',
+      };
+
+      try {
+        // Generate PDF using local service
+        logger.info('Generating PDF using backend service...');
+        const pdfBuffer = await pdfService.generateDailyReportPDF(reportData);
+
+        const filename = `Daily_Report_${reportDate.toISOString().split('T')[0]}.pdf`;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        logger.info(`PDF generated successfully: ${filename}`);
+        return res.send(pdfBuffer);
+      } catch (pdfError) {
+        logger.error('PDF generation error:', pdfError);
+        // Fallback: return report data as JSON
+        return res.json({
+          success: true,
+          fallback: true,
+          message: 'PDF generation service temporarily unavailable. Report data provided in JSON format. You can download the PDF later or try again.',
+          ...reportResult
+        });
+      }
+    } catch (error) {
+      logger.error('downloadDailyReportPDF controller error:', error);
+      return res.status(500).json({ success: false, error: 'Failed to generate report PDF: ' + error.message });
     }
   }
 };

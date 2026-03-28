@@ -34,4 +34,10 @@ router.get('/dashboard', verifyToken, verifyAdminRole, adminController.getDashbo
 // Get specific staff performance
 router.get('/staff/:staffId/performance', verifyToken, verifyAdminRole, adminController.getStaffPerformance);
 
+// Get daily report data
+router.get('/daily-report', verifyToken, verifyAdminRole, adminController.getDailyReport);
+
+// Download daily report as PDF
+router.get('/daily-report/download/pdf', verifyToken, verifyAdminRole, adminController.downloadDailyReportPDF);
+
 export default router;

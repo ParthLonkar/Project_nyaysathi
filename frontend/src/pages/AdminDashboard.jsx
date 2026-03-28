@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api.js';
+import DailyReport from '../components/DailyReport.jsx';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -310,6 +311,12 @@ export default function AdminDashboard() {
             className={`rounded-lg flex items-center px-4 py-3 space-x-3 cursor-pointer transition-all ${activeTab === 'staff' ? 'bg-white text-primary shadow-sm font-bold' : 'text-slate-600 hover:bg-slate-100 hover:translate-x-1'}`}>
             <span className="material-symbols-outlined text-xl">people</span>
             <span className="text-sm">Staff Management</span>
+          </div>
+          <div 
+            onClick={() => setActiveTab('daily-report')}
+            className={`rounded-lg flex items-center px-4 py-3 space-x-3 cursor-pointer transition-all ${activeTab === 'daily-report' ? 'bg-white text-primary shadow-sm font-bold' : 'text-slate-600 hover:bg-slate-100 hover:translate-x-1'}`}>
+            <span className="material-symbols-outlined text-xl">calendar_today</span>
+            <span className="text-sm">Daily Report</span>
           </div>
           <div className="text-slate-600 hover:bg-slate-100 rounded-lg flex items-center px-4 py-3 space-x-3 cursor-pointer transition-transform duration-200 hover:translate-x-1">
             <span className="material-symbols-outlined text-xl">gavel</span>
@@ -773,6 +780,13 @@ export default function AdminDashboard() {
                       <p className="text-sm text-slate-500 mt-2">Add your first staff member to get started</p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Daily Report Tab */}
+              {activeTab === 'daily-report' && (
+                <div>
+                  <DailyReport adminToken={localStorage.getItem('adminToken')} />
                 </div>
               )}
             </>
