@@ -7,6 +7,25 @@ const pythonClient = axios.create({
   timeout: 30000, // 30 seconds
 });
 
+exports.callAIService = async (data) => {
+  try {
+    const response = await axios.post('http://localhost:8000/process-complaint', data, {
+      timeout: 30000,
+    });
+    return response.data;
+  } catch (error) {
+    logger.error('AI service call failed:', error.message);
+
+    const message = error.response?.data?.detail
+      || error.response?.data?.message
+      || 'Failed to call AI service';
+
+    const wrappedError = new Error(message);
+    wrappedError.status = error.response?.status || 502;
+    throw wrappedError;
+  }
+};
+
 exports.processComplaint = async (complaintId, complaintData) => {
   try {
     logger.info(`Sending complaint ${complaintId} to Python service`);

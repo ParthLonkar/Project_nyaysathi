@@ -5,6 +5,7 @@ const errorHandler = require('./middleware/error.middleware');
 const complaintRoutes = require('./routes/complaint.routes');
 const aiRoutes = require('./routes/ai.routes');
 const adminRoutes = require('./routes/admin.routes');
+const authRoutes = require('./routes/auth.routes');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.get('/health', (req, res) => {
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/auth', authRoutes);
 
 // Error handling
 app.use(errorHandler.notFound);

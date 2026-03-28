@@ -1,34 +1,77 @@
+const axios = require('axios');
 const supabase = require('../config/supabase');
-const pythonService = require('../services/python.service');
 const logger = require('../utils/logger');
 
 exports.createComplaint = async (req, res, next) => {
   try {
-    const { title, description, category } = req.body;
-    const userId = req.user.id;
+    console.log('Incoming complaint body:', req.body);
+    const { title, description, location, userId } = req.body || {};
+    const resolvedUserId = userId || 'demo-user';
+
+    const missingFields = [];
+    if (!title) missingFields.push('title');
+    if (!description) missingFields.push('description');
+    if (!location) missingFields.push('location');
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          status: 400,
+          message: `Missing required field(s): ${missingFields.join(', ')}`,
+          required: ['title', 'description', 'location', 'userId'],
+        },
+      });
+    }
+
+    let aiResult;
+    try {
+      const aiResponse = await axios.post('http://localhost:8000/process-complaint', {
+        text: description,
+        location,
+      }, {
+        timeout: 30000,
+      });
+      aiResult = aiResponse.data;
+    } catch (aiError) {
+      logger.error('Failed to process complaint with AI service:', aiError);
+      return res.status(502).json({
+        error: {
+          status: 502,
+          message: 'Failed to process complaint with AI service',
+        },
+      });
+    }
+
+    const complaintPayload = {
+      user_id: resolvedUserId,
+      title,
+      description,
+      category: 'general',
+      status: 'new',
+      priority: typeof aiResult?.priority === 'string' ? aiResult.priority : 'medium',
+      ai_analysis: {
+        ...aiResult,
+        input: {
+          text: description,
+          location,
+        },
+      },
+    };
 
     const { data, error } = await supabase
       .from('complaints')
-      .insert([{
-        user_id: userId,
-        title,
-        description,
-        category,
-        status: 'new',
-        priority: 'medium',
-      }])
-      .select();
+      .insert([complaintPayload])
+      .select()
+      .single();
 
     if (error) throw error;
 
-    // Send to Python service for AI analysis
-    pythonService.processComplaint(data[0].id, {
-      title,
-      description,
-      category,
-    }).catch(err => logger.error('AI processing error:', err));
-
-    res.status(201).json(data[0]);
+    res.status(201).json({
+      success: true,
+      caseId: data.id,
+      aiResult,
+    });
   } catch (error) {
     next(error);
   }

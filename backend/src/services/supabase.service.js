@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const { randomUUID } = require('crypto');
 
 exports.createSupabaseEntry = async (table, data) => {
   const { data: result, error } = await supabase
@@ -8,6 +9,29 @@ exports.createSupabaseEntry = async (table, data) => {
 
   if (error) throw error;
   return result[0];
+};
+
+exports.saveComplaint = async (data) => {
+  const complaint = {
+    id: data.id || randomUUID(),
+    title: data.title,
+    description: data.description,
+    location: data.location,
+    category: data.category,
+    department: data.department,
+    priority: data.priority,
+    status: data.status || 'submitted',
+    created_at: data.created_at || new Date().toISOString(),
+  };
+
+  const { data: result, error } = await supabase
+    .from('complaints')
+    .insert([complaint])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return result;
 };
 
 exports.updateSupabaseEntry = async (table, id, data) => {

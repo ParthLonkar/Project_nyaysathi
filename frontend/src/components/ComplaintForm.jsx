@@ -5,6 +5,7 @@ export default function ComplaintForm() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    location: '',
     category: 'general',
     fullName: '',
     email: '',
@@ -55,6 +56,7 @@ export default function ComplaintForm() {
         setFormData({
           title: '',
           description: '',
+          location: '',
           category: 'general',
           fullName: '',
           email: '',
@@ -67,7 +69,8 @@ export default function ComplaintForm() {
         setSuccess(false);
       }, 3000);
     } catch (err) {
-      setError('Failed to submit complaint: ' + err.message);
+      const errorMessage = err.response?.data?.error?.message || err.message;
+      setError('Failed to submit complaint: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -283,6 +286,19 @@ export default function ComplaintForm() {
               </div>
 
               <div>
+                <label className="block text-sm font-bold text-gray-900 mb-3">Location *</label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  required
+                  placeholder="Area / City where issue happened"
+                  className="w-full px-6 py-4 rounded-2xl border-2 border-gray-200 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all text-gray-900 placeholder-gray-400 font-medium"
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-bold text-gray-900 mb-3">Detailed Description *</label>
                 <textarea
                   name="description"
@@ -365,6 +381,7 @@ export default function ComplaintForm() {
                   <div className="space-y-4 text-teal-900">
                     <div className="text-sm"><span className="font-bold">📂 Category:</span> {categories.find(c => c.value === formData.category)?.label}</div>
                     <div className="text-sm"><span className="font-bold">📝 Title:</span> {formData.title}</div>
+                    <div className="text-sm"><span className="font-bold">📍 Location:</span> {formData.location}</div>
                     <div className="text-sm"><span className="font-bold">⚖️ Against:</span> {formData.respondentName}</div>
                     <div className="text-sm"><span className="font-bold">📅 Date:</span> {formData.incidentDate}</div>
                   </div>
