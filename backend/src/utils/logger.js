@@ -1,9 +1,13 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const logDir = 'logs';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const logDir = path.join(__dirname, '../../logs');
 if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir);
+  fs.mkdirSync(logDir, { recursive: true });
 }
 
 const getTimestamp = () => new Date().toISOString();
@@ -16,7 +20,7 @@ const log = (level, message, data = '') => {
   fs.appendFileSync(logFile, logMessage + '\n');
 };
 
-module.exports = {
+export const logger = {
   info: (message, data) => log('INFO', message, data),
   error: (message, error) => log('ERROR', message, error?.message || error),
   warn: (message, data) => log('WARN', message, data),

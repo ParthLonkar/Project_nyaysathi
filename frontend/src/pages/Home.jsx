@@ -1,8 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Layout from '../components/Layout';
+import { Search } from 'lucide-react';
 
 export default function Home() {
   const navigate = useNavigate();
+  const [trackingId, setTrackingId] = useState('');
+
+  const handleTrackComplaint = (e) => {
+    e.preventDefault();
+    if (trackingId.trim()) {
+      navigate(`/track/${trackingId}`);
+    }
+  };
 
   const stats = [
     { number: '50k+', label: 'Complaints Filed' },
@@ -91,7 +101,8 @@ export default function Home() {
   ];
 
   return (
-    <div className="w-full bg-white">
+    <Layout>
+      <div className="w-full bg-white">
       {/* Hero Section */}
       <section className="relative overflow-hidden py-20 lg:py-32 bg-gray-50">
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
@@ -417,6 +428,95 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Track Your Complaint */}
+      <section className="py-24 bg-gradient-to-r from-blue-600 to-teal-600">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl lg:text-5xl font-black text-white mb-6">Track Your Complaint</h2>
+            <p className="text-white/90 text-lg max-w-2xl mx-auto">
+              Enter your complaint ID to check real-time status, view documents, and track every step of your case.
+            </p>
+          </div>
+
+          <form onSubmit={handleTrackComplaint} className="bg-white rounded-3xl shadow-2xl p-8 lg:p-12">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                  <Search className="w-5 h-5" />
+                </div>
+                <input
+                  type="text"
+                  value={trackingId}
+                  onChange={(e) => setTrackingId(e.target.value.toUpperCase())}
+                  placeholder="Enter your Complaint ID (e.g., NYA-12345678)"
+                  className="w-full pl-12 pr-4 py-4 rounded-xl border-2 border-gray-200 focus:border-blue-600 focus:outline-none text-lg font-mono transition-colors"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={!trackingId.trim()}
+                className="bg-gradient-to-r from-blue-600 to-blue-900 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center gap-2"
+              >
+                <Search className="w-5 h-5" /> Track Now
+              </button>
+            </div>
+            
+            <p className="text-center text-gray-600 text-sm mt-6">
+              Your complaint ID was sent to your email after submission. You can track your case 24/7.
+            </p>
+
+            {/* Quick Links */}
+            <div className="mt-8 pt-8 border-t border-gray-200">
+              <p className="text-gray-600 text-sm font-bold uppercase tracking-wide mb-4">Need Help?</p>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <p className="text-2xl mb-2">📧</p>
+                  <p className="text-gray-700 font-bold mb-1">Can't find your ID?</p>
+                  <a href="mailto:support@nyaysathi.com" className="text-blue-600 font-semibold hover:text-blue-900 text-sm">
+                    Email us for help
+                  </a>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl mb-2">📞</p>
+                  <p className="text-gray-700 font-bold mb-1">Call Us</p>
+                  <p className="text-blue-600 font-semibold text-sm">1800-NYAY-SAT</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl mb-2">💬</p>
+                  <p className="text-gray-700 font-bold mb-1">Live Chat</p>
+                  <button
+                    type="button"
+                    onClick={() => window.alert('Live chat coming soon!')}
+                    className="text-blue-600 font-semibold hover:text-blue-900 text-sm"
+                  >
+                    Chat with us
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          {/* Real-time Tracking Features */}
+          <div className="mt-16 grid md:grid-cols-3 gap-8 text-white">
+            <div className="text-center">
+              <div className="text-5xl mb-4">📊</div>
+              <h3 className="text-xl font-bold mb-2">Real-Time Updates</h3>
+              <p className="text-white/80">Get instant notifications at every stage of your complaint.</p>
+            </div>
+            <div className="text-center">
+              <div className="text-5xl mb-4">📄</div>
+              <h3 className="text-xl font-bold mb-2">View Documents</h3>
+              <p className="text-white/80">Access all AI-generated legal documents in one place.</p>
+            </div>
+            <div className="text-center">
+              <div className="text-5xl mb-4">🔒</div>
+              <h3 className="text-xl font-bold mb-2">Secure & Private</h3>
+              <p className="text-white/80">Bank-grade encryption protects your case information.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section className="py-24 bg-white">
         <div className="max-w-3xl mx-auto px-6">
@@ -613,5 +713,6 @@ export default function Home() {
         </div>
       </footer>
     </div>
+    </Layout>
   );
 }

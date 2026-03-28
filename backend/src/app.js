@@ -1,18 +1,27 @@
-const express = require('express');
-const cors = require('cors');
-const logger = require('./utils/logger');
-const errorHandler = require('./middleware/error.middleware');
-const complaintRoutes = require('./routes/complaint.routes');
-const aiRoutes = require('./routes/ai.routes');
-const adminRoutes = require('./routes/admin.routes');
-const authRoutes = require('./routes/auth.routes');
+import express from 'express';
+import cors from 'cors';
+import { logger } from './utils/logger.js';
+import { errorHandler, notFound } from './middleware/error.middleware.js';
+import complaintRoutes from './routes/complaint.routes.js';
+import aiRoutes from './routes/ai.routes.js';
+import adminRoutes from './routes/admin.routes.js';
+import authRoutes from './routes/auth.routes.js';
+import staffRoutes from './routes/staff.routes.js';
+import { extractUser } from './middleware/auth.middleware.js';
 
 const app = express();
 
 // Middleware
-app.use(cors());
+// CORS configuration - allow credentials with specific origins
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(extractUser);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -22,13 +31,14 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/ai', aiRoutes);
-app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/staff', staffRoutes);
 
 // Error handling
-app.use(errorHandler.notFound);
-app.use(errorHandler.errorHandler);
+app.use(notFound);
+app.use(errorHandler);
 
 logger.info('Express app configured');
 
-module.exports = app;
+export default app;

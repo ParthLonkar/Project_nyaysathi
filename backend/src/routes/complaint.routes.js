@@ -1,13 +1,14 @@
-const express = require('express');
+import express from 'express';
+import { complaintController } from '../controllers/complaint.controller.js';
+import { authenticate } from '../middleware/auth.middleware.js';
+
 const router = express.Router();
-const complaintController = require('../controllers/complaint.controller');
-const { authenticate } = require('../middleware/auth.middleware');
 
 router.post('/', complaintController.createComplaint);
 router.get('/my', authenticate, complaintController.getUserComplaints);
 router.get('/', authenticate, complaintController.getAllComplaints);
 router.get('/:id', authenticate, complaintController.getComplaintById);
 router.patch('/:id/status', authenticate, complaintController.updateComplaintStatus);
-router.delete('/:id', authenticate, complaintController.deleteComplaint);
+router.delete('/:id', complaintController.deleteComplaint);
 
-module.exports = router;
+export default router;

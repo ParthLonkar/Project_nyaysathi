@@ -3,36 +3,141 @@
 @tailwind utilities;
 
 @layer components {
+  /* Buttons */
   .btn-primary {
-    @apply px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors;
+    @apply px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-900 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-200;
   }
 
   .btn-primary:disabled {
-    @apply opacity-60 cursor-not-allowed;
+    @apply opacity-60 cursor-not-allowed hover:scale-100;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors;
+    @apply px-6 py-3 bg-gray-200 text-gray-800 rounded-xl font-semibold hover:bg-gray-300 transition-all duration-200;
   }
 
+  .btn-secondary:disabled {
+    @apply opacity-60 cursor-not-allowed;
+  }
+
+  .btn-outline {
+    @apply px-6 py-3 border-2 border-blue-900 text-blue-900 rounded-xl font-semibold hover:bg-blue-50 transition-all duration-200;
+  }
+
+  .btn-tertiary {
+    @apply px-6 py-3 bg-emerald-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-200;
+  }
+
+  /* Forms */
   .input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500;
+    @apply w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium;
+  }
+
+  .input-field:disabled {
+    @apply bg-gray-100 cursor-not-allowed;
+  }
+
+  .textarea-field {
+    @apply w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium resize-vertical min-h-32;
   }
 
   .form-label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply block text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide;
   }
 
+  .form-group {
+    @apply mb-6 space-y-2;
+  }
+
+  /* Cards */
   .card {
-    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+    @apply bg-white rounded-2xl border-2 border-gray-100 shadow-lg hover:shadow-xl transition-shadow duration-200;
   }
 
+  .card-compact {
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  }
+
+  .card-premium {
+    @apply bg-gradient-to-br from-blue-50 to-teal-50 rounded-2xl border-2 border-blue-200 shadow-lg;
+  }
+
+  /* Status Badges */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider;
+  }
+
+  .badge-success {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-danger {
+    @apply bg-red-100 text-red-800;
+  }
+
+  .badge-info {
+    @apply bg-blue-100 text-blue-800;
+  }
+
+  /* Section Styling */
+  .section-header {
+    @apply text-4xl md:text-5xl font-black text-blue-900 mb-4 tracking-tight;
+  }
+
+  .section-subheader {
+    @apply text-lg text-gray-600 max-w-2xl leading-relaxed;
+  }
+
+  .section-badge {
+    @apply inline-block mb-4 px-4 py-2 bg-blue-100 text-blue-900 rounded-full text-sm font-semibold;
+  }
+
+  /* Grid */
+  .grid-responsive {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+  }
+
+  /* Container */
   .container {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    @apply max-w-7xl mx-auto px-6 sm:px-8 lg:px-10;
+  }
+
+  .container-lg {
+    @apply max-w-7xl mx-auto px-6;
+  }
+
+  /* Page Section */
+  .page-section {
+    @apply py-16 md:py-24 lg:py-32;
+  }
+
+  /* Alert */
+  .alert {
+    @apply p-6 rounded-2xl border-2 flex items-start gap-4;
+  }
+
+  .alert-success {
+    @apply bg-green-50 border-green-300;
+  }
+
+  .alert-warning {
+    @apply bg-yellow-50 border-yellow-300;
+  }
+
+  .alert-error {
+    @apply bg-red-50 border-red-300;
+  }
+
+  .alert-info {
+    @apply bg-blue-50 border-blue-300;
   }
 }
 
-/* Spinner animation */
+/* Animations */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -40,4 +145,22 @@
 
 .spinner {
   animation: spin 1s linear infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
 }

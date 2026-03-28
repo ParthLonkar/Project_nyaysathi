@@ -1,66 +1,69 @@
-const axios = require('axios');
-const config = require('../config/env');
-const logger = require('../utils/logger');
+import axios from 'axios';
+import { logger } from '../utils/logger.js';
+
+const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
 
 const pythonClient = axios.create({
-  baseURL: config.PYTHON_SERVICE_URL,
+  baseURL: PYTHON_SERVICE_URL,
   timeout: 30000, // 30 seconds
 });
 
-exports.callAIService = async (data) => {
-  try {
-    const response = await axios.post('http://localhost:8000/process-complaint', data, {
-      timeout: 30000,
-    });
-    return response.data;
-  } catch (error) {
-    logger.error('AI service call failed:', error.message);
+export const pythonService = {
+  callAIService: async (data) => {
+    try {
+      const response = await axios.post(`${PYTHON_SERVICE_URL}/process-complaint`, data, {
+        timeout: 30000,
+      });
+      return response.data;
+    } catch (error) {
+      logger.error('AI service call failed:', error.message);
 
-    const message = error.response?.data?.detail
-      || error.response?.data?.message
-      || 'Failed to call AI service';
+      const message = error.response?.data?.detail
+        || error.response?.data?.message
+        || 'Failed to call AI service';
 
-    const wrappedError = new Error(message);
-    wrappedError.status = error.response?.status || 502;
-    throw wrappedError;
-  }
-};
+      const wrappedError = new Error(message);
+      wrappedError.status = error.response?.status || 502;
+      throw wrappedError;
+    }
+  },
 
-exports.processComplaint = async (complaintId, complaintData) => {
-  try {
-    logger.info(`Sending complaint ${complaintId} to Python service`);
-    
-    const response = await pythonClient.post('/api/process', {
-      complaint_id: complaintId,
-      ...complaintData,
-    });
+  processComplaint: async (complaintId, complaintData) => {
+    try {
+      logger.info(`Sending complaint ${complaintId} to Python service`);
+      
+      const response = await pythonClient.post('/api/process', {
+        complaint_id: complaintId,
+        ...complaintData,
+      });
 
-    return response.data;
-  } catch (error) {
-    logger.error('Python service error:', error.message);
-    throw new Error('Failed to process complaint with AI service');
-  }
-};
+      return response.data;
+    } catch (error) {
+      logger.error('Python service error:', error.message);
+      throw new Error('Failed to process complaint with AI service');
+    }
+  },
 
-exports.getProcessingStatus = async (complaintId) => {
-  try {
-    const response = await pythonClient.get(`/api/status/${complaintId}`);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to get processing status:', error.message);
-    throw error;
-  }
-};
+  getProcessingStatus: async (complaintId) => {
+    try {
+      const response = await pythonClient.get(`/api/status/${complaintId}`);
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to get processing status:', error.message);
+      throw error;
+    }
+  },
 
-exports.escalateComplaint = async (complaintId, reason) => {
-  try {
-    const response = await pythonClient.post(`/api/escalate`, {
-      complaint_id: complaintId,
-      reason,
-    });
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to escalate complaint:', error.message);
-    throw error;
+  escalateComplaint: async (complaintId, reason) => {
+    try {
+      const response = await pythonClient.post(`/api/escalate`, {
+        complaint_id: complaintId,
+        reason,
+      });
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to escalate complaint:', error.message);
+      throw error;
+    }
   }
 };

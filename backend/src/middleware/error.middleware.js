@@ -1,6 +1,6 @@
-const logger = require('../utils/logger');
+import { logger } from '../utils/logger.js';
 
-exports.errorHandler = (err, req, res, next) => {
+export const errorHandler = (err, req, res, next) => {
   logger.error('Error:', err);
 
   const status = err.status || 500;
@@ -15,7 +15,7 @@ exports.errorHandler = (err, req, res, next) => {
   });
 };
 
-exports.notFound = (req, res) => {
+export const notFound = (req, res) => {
   res.status(404).json({
     error: {
       status: 404,

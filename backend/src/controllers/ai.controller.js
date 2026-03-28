@@ -1,72 +1,76 @@
-const pythonService = require('../services/python.service');
-const supabase = require('../config/supabase');
-const logger = require('../utils/logger');
+import { pythonService } from '../services/python.service.js';
+import { createClient } from '@supabase/supabase-js';
+import { logger } from '../utils/logger.js';
 
-exports.processComplaint = async (req, res, next) => {
-  try {
-    const { complaintId } = req.body;
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-    const { data: complaint, error } = await supabase
-      .from('complaints')
-      .select('*')
-      .eq('id', complaintId)
-      .single();
+export const aiController = {
+  processComplaint: async (req, res, next) => {
+    try {
+      const { complaintId } = req.body;
 
-    if (error) throw error;
+      const { data: complaint, error } = await supabase
+        .from('complaints')
+        .select('*')
+        .eq('id', complaintId)
+        .single();
 
-    const analysisResult = await pythonService.processComplaint(complaintId, {
-      title: complaint.title,
-      description: complaint.description,
-      category: complaint.category,
-    });
+      if (error) throw error;
 
-    // Update complaint with AI analysis results
-    const { data: updated, error: updateError } = await supabase
-      .from('complaints')
-      .update({
-        ai_analysis: analysisResult,
-        status: 'processing',
-        priority: analysisResult.priority,
-      })
-      .eq('id', complaintId)
-      .select()
-      .single();
+      const analysisResult = await pythonService.processComplaint(complaintId, {
+        title: complaint.title,
+        description: complaint.description,
+        category: complaint.category,
+      });
 
-    if (updateError) throw updateError;
-    res.json(updated);
-  } catch (error) {
-    next(error);
-  }
-};
+      // Update complaint with AI analysis results
+      const { data: updated, error: updateError } = await supabase
+        .from('complaints')
+        .update({
+          ai_analysis: analysisResult,
+          status: 'processing',
+          priority: analysisResult.priority,
+        })
+        .eq('id', complaintId)
+        .select()
+        .single();
 
-exports.getProcessingStatus = async (req, res, next) => {
-  try {
-    const { complaintId } = req.params;
-    const status = await pythonService.getProcessingStatus(complaintId);
-    res.json(status);
-  } catch (error) {
-    next(error);
-  }
-};
+      if (updateError) throw updateError;
+      res.json(updated);
+    } catch (error) {
+      next(error);
+    }
+  },
 
-exports.escalateComplaint = async (req, res, next) => {
-  try {
-    const { complaintId, reason } = req.body;
+  getProcessingStatus: async (req, res, next) => {
+    try {
+      const { complaintId } = req.params;
+      const status = await pythonService.getProcessingStatus(complaintId);
+      res.json(status);
+    } catch (error) {
+      next(error);
+    }
+  },
 
-    const { data, error } = await supabase
-      .from('complaints')
-      .update({
-        status: 'escalated',
-        escalation_reason: reason,
-        escalated_at: new Date(),
-      })
-      .eq('id', complaintId)
-      .select()
-      .single();
+  escalateComplaint: async (req, res, next) => {
+    try {
+      const { complaintId, reason } = req.body;
 
-    if (error) throw error;
-    res.json(data);
-  } catch (error) {
-    next(error);
-  }
+      const { data, error } = await supabase
+        .from('complaints')
+        .update({
+          status: 'escalated',
+          escalation_reason: reason,
+          escalated_at: new Date(),
+        })
+        .eq('id', complaintId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  },
 };

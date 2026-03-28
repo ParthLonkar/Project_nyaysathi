@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import Layout from '../components/Layout';
 import { complaintService } from '../services/complaint.service';
 
 export default function ComplaintDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,60 +25,127 @@ export default function ComplaintDetails() {
     }
   };
 
-  if (loading) return <div className="text-center py-12">Loading...</div>;
-  if (error) return <div className="max-w-4xl mx-auto p-4 bg-red-50 text-red-700 rounded-md">{error}</div>;
-  if (!complaint) return <div className="text-center py-12">Complaint not found</div>;
+  const getStatusColor = (status) => {
+    const colors = {
+      'new': 'bg-blue-100 text-blue-900',
+      'processing': 'bg-orange-100 text-orange-900',
+      'escalated': 'bg-red-100 text-red-900',
+      'resolved': 'bg-green-100 text-green-900',
+    };
+    return colors[status?.toLowerCase()] || 'bg-gray-100 text-gray-900';
+  };
+
+  const getPriorityColor = (priority) => {
+    const colors = {
+      'high': 'bg-red-100 text-red-900',
+      'medium': 'bg-yellow-100 text-yellow-900',
+      'low': 'bg-green-100 text-green-900',
+    };
+    return colors[priority?.toLowerCase()] || 'bg-gray-100 text-gray-900';
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="page-section flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent mx-auto mb-6"></div>
+            <p className="text-xl text-gray-600 font-semibold">Loading complaint details...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error || !complaint) {
+    return (
+      <Layout>
+        <div className="page-section bg-gradient-to-b from-red-50 to-white">
+          <div className="container-lg">
+            <div className="card p-12 border-2 border-red-300">
+              <p className="text-center text-lg text-red-700 font-bold">{error || 'Complaint not found'}</p>
+              <button onClick={() => navigate('/dashboard')} className="btn-primary mx-auto mt-6">
+                ← Back to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="card p-8">
-          <div className="flex justify-between items-start mb-8">
-            <h1 className="text-4xl font-bold text-gray-900">{complaint.title}</h1>
-            <span className={`px-4 py-2 rounded-full text-white font-semibold ${
-              complaint.status === 'resolved' ? 'bg-green-500' :
-              complaint.status === 'escalated' ? 'bg-red-500' :
-              complaint.status === 'processing' ? 'bg-yellow-500' :
-              'bg-blue-500'
-            }`}>
-              {complaint.status}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 mb-8">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-600 uppercase">Category</h3>
-              <p className="text-lg text-gray-900 mt-1">{complaint.category}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-600 uppercase">Priority</h3>
-              <p className="text-lg text-gray-900 mt-1">{complaint.priority}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-600 uppercase">Created</h3>
-              <p className="text-lg text-gray-900 mt-1">{new Date(complaint.created_at).toLocaleString()}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-gray-600 uppercase">Last Updated</h3>
-              <p className="text-lg text-gray-900 mt-1">{new Date(complaint.updated_at).toLocaleString()}</p>
+    <Layout>
+      <div className="page-section bg-gradient-to-b from-blue-50 to-white">
+        <div className="container-lg">
+          {/* Header */}
+          <div className="mb-12">
+            <button onClick={() => navigate('/dashboard')} className="text-blue-900 font-bold mb-6 hover:text-blue-700 transition-colors">
+              ← Back to Dashboard
+            </button>
+            <div className="flex justify-between items-start gap-6 mb-6">
+              <div className="flex-1">
+                <h1 className="section-header mb-4">{complaint.title}</h1>
+              </div>
+              <span className={`badge px-6 py-2 text-lg font-black whitespace-nowrap ${getStatusColor(complaint.status)}`}>
+                {complaint.status?.toUpperCase().replace('_', ' ')}
+              </span>
             </div>
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Description</h2>
-            <p className="text-gray-700 leading-relaxed">{complaint.description}</p>
+          {/* Details Grid */}
+          <div className="grid md:grid-cols-4 gap-6 mb-12">
+            <div className="card p-8">
+              <p className="text-sm text-gray-600 font-bold uppercase tracking-widest mb-3">Category</p>
+              <p className="text-2xl font-black text-gray-900">{complaint.category}</p>
+            </div>
+            <div className="card p-8">
+              <p className="text-sm text-gray-600 font-bold uppercase tracking-widest mb-3">Priority</p>
+              <span className={`badge px-3 py-1 text-lg font-black ${getPriorityColor(complaint.priority)}`}>
+                {complaint.priority?.toUpperCase()}
+              </span>
+            </div>
+            <div className="card p-8">
+              <p className="text-sm text-gray-600 font-bold uppercase tracking-widest mb-3">Created</p>
+              <p className="text-sm font-bold text-gray-900">{new Date(complaint.created_at).toLocaleDateString()}</p>
+            </div>
+            <div className="card p-8">
+              <p className="text-sm text-gray-600 font-bold uppercase tracking-widest mb-3">Last Updated</p>
+              <p className="text-sm font-bold text-gray-900">{new Date(complaint.updated_at).toLocaleDateString()}</p>
+            </div>
           </div>
 
+          {/* Description */}
+          <div className="card p-10 shadow-lg mb-12">
+            <h2 className="text-3xl font-black text-gray-900 mb-8 flex items-center gap-3">
+              <span className="text-3xl">📝</span> Description
+            </h2>
+            <p className="text-lg text-gray-700 leading-relaxed">{complaint.description}</p>
+          </div>
+
+          {/* AI Analysis */}
           {complaint.ai_analysis && (
-            <div className="border-t border-gray-200 pt-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">AI Analysis</h2>
-              <div className="bg-gray-50 p-6 rounded-lg font-mono text-sm overflow-auto max-h-96">
-                <pre>{JSON.stringify(complaint.ai_analysis, null, 2)}</pre>
+            <div className="card-premium p-10 shadow-xl mb-12 border-2 border-blue-300">
+              <h2 className="text-3xl font-black text-blue-900 mb-8 flex items-center gap-3">
+                <span className="text-3xl">🧠</span> AI Legal Analysis
+              </h2>
+              <div className="bg-white rounded-xl p-8 font-mono text-sm overflow-auto max-h-96 border border-gray-300">
+                <pre className="whitespace-pre-wrap break-words text-gray-700">{JSON.stringify(complaint.ai_analysis, null, 2)}</pre>
               </div>
             </div>
           )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-6 justify-center">
+            <button onClick={() => navigate('/dashboard')} className="btn-primary">
+              ← Back to Dashboard
+            </button>
+            <button className="btn-secondary">
+              📋 Download Report
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

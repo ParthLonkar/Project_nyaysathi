@@ -1,17 +1,27 @@
-const express = require('express');
+import express from 'express';
+import { authController } from '../controllers/auth.controller.js';
+import { verifyToken } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-router.get('/me', (req, res) => {
-  res.status(200).json({
-    success: true,
-    user: {
-      id: 'demo-user',
-      name: 'Demo User',
-      email: 'demo@nyaysathi.ai',
-      role: 'citizen',
-    },
-  });
-});
+/**
+ * Authentication Routes
+ * Public routes for login and token verification
+ */
 
-module.exports = router;
+// Admin login
+router.post('/admin/login', authController.adminLogin);
+
+// Staff login
+router.post('/staff/login', authController.staffLogin);
+
+// Logout
+router.post('/logout', authController.logout);
+
+// Verify token (protected)
+router.get('/verify-token', verifyToken, authController.verifyToken);
+
+// Refresh token
+router.post('/refresh-token', authController.refreshToken);
+
+export default router;

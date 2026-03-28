@@ -1,70 +1,234 @@
-const supabase = require('../config/supabase');
+import { adminService } from '../services/admin.service.js';
+import { logger } from '../utils/logger.js';
 
-exports.getUsers = async (req, res, next) => {
-  try {
-    const { data, error } = await supabase.auth.admin.listUsers();
-    if (error) throw error;
-    res.json(data.users);
-  } catch (error) {
-    next(error);
-  }
-};
+/**
+ * Admin Controller
+ * Handles HTTP requests for admin operations
+ */
 
-exports.getComplaintStats = async (req, res, next) => {
-  try {
-    const { data, error } = await supabase
-      .from('complaints')
-      .select('status, priority', { count: 'exact' });
+export const adminController = {
+  /**
+   * Get all complaints for admin's department
+   * GET /admin/complaints
+   */
+  getComplaints: async (req, res) => {
+    try {
+      const { id: adminId, department_id } = req.user;
+      const { status, priority } = req.query;
 
-    if (error) throw error;
+      if (!department_id) {
+        return res.status(400).json({ error: 'Department ID required' });
+      }
 
-    const stats = {
-      total: data.length,
-      byStatus: {},
-      byPriority: {},
-    };
+      const result = await adminService.getDepartmentComplaints(department_id, {
+        status,
+        priority
+      });
 
-    data.forEach(item => {
-      stats.byStatus[item.status] = (stats.byStatus[item.status] || 0) + 1;
-      stats.byPriority[item.priority] = (stats.byPriority[item.priority] || 0) + 1;
-    });
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
 
-    res.json(stats);
-  } catch (error) {
-    next(error);
-  }
-};
+      return res.json(result);
+    } catch (error) {
+      logger.error('Get complaints error:', error);
+      return res.status(500).json({ error: 'Failed to get complaints' });
+    }
+  },
 
-exports.updateUserRole = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { role } = req.body;
+  /**
+   * Get all staff in admin's department
+   * GET /admin/staff
+   */
+  getStaff: async (req, res) => {
+    try {
+      const { department_id } = req.user;
 
-    const { data, error } = await supabase
-      .from('user_roles')
-      .update({ role })
-      .eq('user_id', id)
-      .select()
-      .single();
+      if (!department_id) {
+        return res.status(400).json({ error: 'Department ID required' });
+      }
 
-    if (error) throw error;
-    res.json(data);
-  } catch (error) {
-    next(error);
-  }
-};
+      const result = await adminService.getDepartmentStaff(department_id);
 
-exports.deleteComplaint = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { error } = await supabase
-      .from('complaints')
-      .delete()
-      .eq('id', id);
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
 
-    if (error) throw error;
-    res.status(204).send();
-  } catch (error) {
-    next(error);
+      return res.json(result);
+    } catch (error) {
+      logger.error('Get staff error:', error);
+      return res.status(500).json({ error: 'Failed to get staff' });
+    }
+  },
+
+  /**
+   * Assign complaint to staff member
+   * POST /admin/assign-complaint
+   * Body: { complaintId, staffId, notes? }
+   */
+  assignComplaint: async (req, res) => {
+    try {
+      const { id: adminId, department_id } = req.user;
+      const { complaintId, staffId, notes } = req.body;
+
+      if (!complaintId || !staffId) {
+        return res.status(400).json({ error: 'Complaint ID and Staff ID required' });
+      }
+
+      const result = await adminService.assignComplaintToStaff(
+        complaintId,
+        staffId,
+        adminId,
+        department_id,
+        notes
+      );
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Assign complaint error:', error);
+      return res.status(500).json({ error: 'Failed to assign complaint' });
+    }
+  },
+
+  /**
+   * Create new staff member
+   * POST /admin/staff
+   * Body: { username, password, staff_name, email, phone, position }
+   */
+  createStaff: async (req, res) => {
+    try {
+      const { id: adminId, department_id } = req.user;
+      const { username, password, staff_name, email, phone, position } = req.body;
+
+      if (!username || !password || !staff_name || !email || !position) {
+        return res.status(400).json({ error: 'Required fields: username, password, staff_name, email, position' });
+      }
+
+      const result = await adminService.createStaff(
+        {
+          username,
+          password,
+          staff_name,
+          email,
+          phone: phone || null,
+          position
+        },
+        department_id,
+        adminId
+      );
+
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+
+      return res.status(201).json(result);
+    } catch (error) {
+      logger.error('Create staff error:', error);
+      return res.status(500).json({ error: 'Failed to create staff' });
+    }
+  },
+
+  /**
+   * Deactivate staff member
+   * PUT /admin/staff/:staffId/deactivate
+   */
+  deactivateStaff: async (req, res) => {
+    try {
+      const { staffId } = req.params;
+
+      if (!staffId) {
+        return res.status(400).json({ error: 'Staff ID required' });
+      }
+
+      const result = await adminService.deactivateStaff(staffId);
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Deactivate staff error:', error);
+      return res.status(500).json({ error: 'Failed to deactivate staff' });
+    }
+  },
+
+  /**
+   * Get department analytics
+   * GET /admin/analytics
+   */
+  getAnalytics: async (req, res) => {
+    try {
+      const { department_id } = req.user;
+
+      if (!department_id) {
+        return res.status(400).json({ error: 'Department ID required' });
+      }
+
+      const result = await adminService.getDepartmentAnalytics(department_id);
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Get analytics error:', error);
+      return res.status(500).json({ error: 'Failed to get analytics' });
+    }
+  },
+
+  /**
+   * Get dashboard summary
+   * GET /admin/dashboard
+   */
+  getDashboard: async (req, res) => {
+    try {
+      const { department_id } = req.user;
+
+      if (!department_id) {
+        return res.status(400).json({ error: 'Department ID required' });
+      }
+
+      const result = await adminService.getDashboardSummary(department_id);
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Get dashboard error:', error);
+      return res.status(500).json({ error: 'Failed to get dashboard' });
+    }
+  },
+
+  /**
+   * Get staff performance
+   * GET /admin/staff/:staffId/performance
+   */
+  getStaffPerformance: async (req, res) => {
+    try {
+      const { staffId } = req.params;
+
+      if (!staffId) {
+        return res.status(400).json({ error: 'Staff ID required' });
+      }
+
+      const result = await adminService.getStaffPerformance(staffId);
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Get staff performance error:', error);
+      return res.status(500).json({ error: 'Failed to get staff performance' });
+    }
   }
 };

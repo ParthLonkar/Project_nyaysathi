@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { complaintService } from '../services/complaint.service';
 
 export default function ComplaintForm() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -51,27 +53,24 @@ export default function ComplaintForm() {
 
     try {
       const response = await complaintService.submitComplaint(formData);
-      setSuccess(true);
-      setTimeout(() => {
-        setFormData({
-          title: '',
-          description: '',
-          location: '',
-          category: 'general',
-          fullName: '',
-          email: '',
-          phone: '',
-          respondentName: '',
-          incidentDate: '',
-          attachment: null,
-        });
-        setStep(1);
-        setSuccess(false);
-      }, 3000);
+      
+      // Generate complaint ID
+      const complaintId = `NYA-${Date.now().toString().slice(-8)}`;
+      
+      // Redirect to submission confirmation page with complaint data
+      navigate('/submission-confirmation', {
+        state: {
+          complaint: {
+            ...formData,
+            complaintId,
+            submittedAt: new Date().toISOString(),
+            ...(response.data && response.data)
+          }
+        }
+      });
     } catch (err) {
       const errorMessage = err.response?.data?.error?.message || err.message;
       setError('Failed to submit complaint: ' + errorMessage);
-    } finally {
       setLoading(false);
     }
   };
@@ -91,17 +90,6 @@ export default function ComplaintForm() {
             Our AI-powered system will analyze your complaint, identify applicable laws, and generate perfect legal documents instantly.
           </p>
         </div>
-
-        {/* Success Alert */}
-        {success && (
-          <div className="mb-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-3xl flex items-center gap-4 shadow-lg">
-            <div className="text-5xl">✅</div>
-            <div>
-              <h3 className="text-xl font-black text-green-900 mb-1">Complaint Submitted Successfully!</h3>
-              <p className="text-green-700">Your complaint reference ID will be sent to your email. Our AI is analyzing your case now.</p>
-            </div>
-          </div>
-        )}
 
         {/* Error Alert */}
         {error && (

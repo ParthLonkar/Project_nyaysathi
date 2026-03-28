@@ -1,11 +1,37 @@
-const express = require('express');
+import express from 'express';
+import { adminController } from '../controllers/admin.controller.js';
+import { verifyToken } from '../middleware/auth.middleware.js';
+import { verifyAdminRole } from '../middleware/admin.middleware.js';
+
 const router = express.Router();
-const adminController = require('../controllers/admin.controller');
-const { authenticate, authorize } = require('../middleware/auth.middleware');
 
-router.get('/users', authenticate, authorize('admin'), adminController.getUsers);
-router.get('/complaints/stats', authenticate, authorize('admin'), adminController.getComplaintStats);
-router.patch('/users/:id/role', authenticate, authorize('admin'), adminController.updateUserRole);
-router.delete('/complaints/:id', authenticate, authorize('admin'), adminController.deleteComplaint);
+/**
+ * Admin Routes (Protected)
+ * All routes require admin authentication
+ */
 
-module.exports = router;
+// Get all complaints for department
+router.get('/complaints', verifyToken, verifyAdminRole, adminController.getComplaints);
+
+// Get all staff in department
+router.get('/staff', verifyToken, verifyAdminRole, adminController.getStaff);
+
+// Assign complaint to staff
+router.post('/assign-complaint', verifyToken, verifyAdminRole, adminController.assignComplaint);
+
+// Create new staff
+router.post('/staff', verifyToken, verifyAdminRole, adminController.createStaff);
+
+// Deactivate staff member
+router.put('/staff/:staffId/deactivate', verifyToken, verifyAdminRole, adminController.deactivateStaff);
+
+// Get department analytics
+router.get('/analytics', verifyToken, verifyAdminRole, adminController.getAnalytics);
+
+// Get dashboard summary
+router.get('/dashboard', verifyToken, verifyAdminRole, adminController.getDashboard);
+
+// Get specific staff performance
+router.get('/staff/:staffId/performance', verifyToken, verifyAdminRole, adminController.getStaffPerformance);
+
+export default router;
