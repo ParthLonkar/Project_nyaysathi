@@ -2,9 +2,6 @@ import json
 import re
 from typing import Any, Optional
 
-from app.services.openai_service import llm
-
-
 DEPARTMENT_RULES = [
     {"category": "water", "department": "Water Department", "keywords": ["water", "pipeline", "no supply", "tap", "sewage", "leakage", "drinking water"]},
     {"category": "electricity", "department": "Electricity Board", "keywords": ["electricity", "power", "outage", "transformer", "voltage", "meter"]},
@@ -19,6 +16,45 @@ DEPARTMENT_RULES = [
 
 FALLBACK_CATEGORY = "general"
 FALLBACK_DEPARTMENT = "Municipal Grievance Cell"
+
+CRIME_HIGH_SIGNAL_HINTS = [
+    "harassment",
+    "threat",
+    "assault",
+    "violence",
+    "drug",
+    "drug dealing",
+    "illegal products",
+    "selling illegal",
+    "theft",
+    "extortion",
+    "stalking",
+]
+
+ROADS_HIGH_SIGNAL_HINTS = [
+    "pothole",
+    "potholes",
+    "road damage",
+    "broken road",
+    "dangerous road",
+]
+
+ROADS_DANGER_HINTS = [
+    "danger",
+    "dangerous",
+    "injury",
+    "accident",
+    "school bus",
+]
+
+PUBLIC_HEALTH_SIGNAL_HINTS = [
+    "dirty water",
+    "contaminated water",
+    "no water supply for many days",
+    "garbage smell",
+    "sewage overflow",
+    "children are sick",
+]
 
 RTI_HINTS = [
     "rti",
@@ -64,6 +100,30 @@ def _token_count(text: str) -> int:
     return len(re.findall(r"[a-zA-Z0-9']+", text or ""))
 
 
+def _mentions_long_water_outage(text_lower: str) -> bool:
+    return (
+        "no water supply" in text_lower
+        and (
+            "many days" in text_lower
+            or "for days" in text_lower
+            or "for 3 days" in text_lower
+            or "for 4 days" in text_lower
+            or "for 5 days" in text_lower
+            or "for 6 days" in text_lower
+            or "for 7 days" in text_lower
+            or "week" in text_lower
+        )
+    )
+
+
+def _get_llm():
+    try:
+        from app.services.openai_service import llm  # lazy import for safer fallback environments
+        return llm
+    except Exception:
+        return None
+
+
 def _score_rule(text_lower: str, rule: dict[str, Any]) -> int:
     return sum(1 for kw in rule["keywords"] if kw in text_lower)
 
@@ -82,6 +142,59 @@ def _deterministic_analysis(text: str, location: str = "") -> dict[str, Any]:
     source = _normalize(f"{text} {location}")
     text_lower = source.lower()
 
+    is_crime_signal = _contains_any(text_lower, CRIME_HIGH_SIGNAL_HINTS)
+    is_roads_signal = _contains_any(text_lower, ROADS_HIGH_SIGNAL_HINTS)
+    is_roads_danger_signal = is_roads_signal and _contains_any(text_lower, ROADS_DANGER_HINTS)
+    is_public_health_signal = _contains_any(text_lower, PUBLIC_HEALTH_SIGNAL_HINTS) or _mentions_long_water_outage(text_lower)
+    is_repeated_no_action = _contains_any(text_lower, REPEATED_NO_ACTION_HINTS)
+    is_rti_signal = _contains_any(text_lower, RTI_HINTS)
+    is_high_impact = _contains_any(text_lower, HIGH_PRIORITY_HINTS)
+
+    # Strong-signal path first (deterministic override for routing quality)
+    if is_crime_signal:
+        legal_path = "complaint_and_rti" if is_rti_signal else "complaint_only"
+        return {
+            "category": "police",
+            "department": "Police",
+            "priority": "high",
+            "legal_path": legal_path,
+            "legal_strategy": _build_legal_strategy(legal_path, "Police"),
+            "escalation_risk": "high",
+            "manual_review": False,
+            "confidence_score": 0.92,
+            "decision_rationale": "Strong crime/safety keywords detected; routed to Police with high priority.",
+        }
+
+    if is_roads_signal:
+        legal_path = "complaint_and_rti" if (is_rti_signal or is_repeated_no_action) else "complaint_only"
+        return {
+            "category": "roads",
+            "department": "Public Works / Roads",
+            "priority": "high" if (is_roads_danger_signal or is_high_impact) else "medium",
+            "legal_path": legal_path,
+            "legal_strategy": _build_legal_strategy(legal_path, "Public Works / Roads"),
+            "escalation_risk": "high" if (is_roads_danger_signal or is_repeated_no_action) else "medium",
+            "manual_review": False,
+            "confidence_score": 0.86,
+            "decision_rationale": "Road damage/pothole signal detected; routed to Public Works / Roads with elevated priority.",
+        }
+
+    if is_public_health_signal:
+        inferred_category = "water" if ("water" in text_lower or "sewage" in text_lower) else "sanitation"
+        inferred_department = "Water Department" if inferred_category == "water" else "Municipal Sanitation"
+        legal_path = "complaint_and_rti" if (is_rti_signal or is_repeated_no_action) else "complaint_only"
+        return {
+            "category": inferred_category,
+            "department": inferred_department,
+            "priority": "high",
+            "legal_path": legal_path,
+            "legal_strategy": _build_legal_strategy(legal_path, inferred_department),
+            "escalation_risk": "high" if is_repeated_no_action else "medium",
+            "manual_review": False,
+            "confidence_score": 0.88,
+            "decision_rationale": "Public health/civic-risk keywords detected; routed for urgent departmental action.",
+        }
+
     scored = []
     for rule in DEPARTMENT_RULES:
         score = _score_rule(text_lower, rule)
@@ -94,10 +207,7 @@ def _deterministic_analysis(text: str, location: str = "") -> dict[str, Any]:
     category = top_rule["category"] if top_score > 0 else FALLBACK_CATEGORY
     department = top_rule["department"] if top_score > 0 else FALLBACK_DEPARTMENT
 
-    is_repeated_no_action = _contains_any(text_lower, REPEATED_NO_ACTION_HINTS)
-    is_rti_signal = _contains_any(text_lower, RTI_HINTS)
-    is_high_impact = _contains_any(text_lower, HIGH_PRIORITY_HINTS)
-    is_vague = _token_count(source) < 8 or source.lower() in {"help", "problem", "issue", "complaint"}
+    is_vague = (_token_count(source) < 6 and top_score == 0) or source.lower() in {"help", "problem", "issue", "complaint"}
 
     if is_vague:
         legal_path = "manual_review"
@@ -192,6 +302,10 @@ def _parse_json_response(raw: str) -> Optional[dict[str, Any]]:
 def _llm_refine_if_needed(base: dict[str, Any], text: str, location: str = "") -> dict[str, Any]:
     ambiguous = base.get("confidence_score", 0) < 0.62 or base.get("manual_review") is True
     if not ambiguous:
+        return base
+
+    llm = _get_llm()
+    if llm is None:
         return base
 
     prompt = f"""
