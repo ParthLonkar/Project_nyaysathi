@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # Google Gemini Settings
     GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-pro"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     # Supabase Settings
     SUPABASE_URL: str
@@ -31,6 +31,13 @@ class Settings(BaseSettings):
             if v in {"debug", "dev", "development"}:
                 return True
         return value
+
+    @field_validator("GEMINI_MODEL", mode="before")
+    @classmethod
+    def normalize_gemini_model(cls, value):
+        if not value:
+            return "gemini-2.5-flash"
+        return str(value).strip()
 
     model_config = SettingsConfigDict(
         env_file=".env",

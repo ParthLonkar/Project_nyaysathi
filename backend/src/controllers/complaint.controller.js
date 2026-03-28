@@ -2,6 +2,7 @@ import { logger } from '../utils/logger.js';
 import { pythonService } from '../services/python.service.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { attachmentService } from '../services/attachment.service.js';
+import { documentService } from '../services/document.service.js';
 import { routeComplaint, generateRoutingRecommendations } from '../services/routing.service.js';
 import { actionAgentService } from '../services/action-agent.service.js';
 
@@ -44,6 +45,21 @@ const deriveProgressFromStatus = (status = 'new') => {
     closed: 100,
   };
   return map[key] ?? 20;
+};
+
+const mapCitizenDocument = (doc = {}) => ({
+  document_type: doc.document_type || 'document',
+  file_name: doc.file_name || 'document',
+  download_url: doc.download_url || doc.signed_url || doc.public_url || null,
+  signed_url: doc.signed_url || null,
+  public_url: doc.public_url || null,
+  view_url: doc.view_url || doc.download_url || doc.signed_url || doc.public_url || null,
+  created_at: doc.created_at || null,
+});
+
+const mapCitizenDocuments = (documents = []) => {
+  if (!Array.isArray(documents)) return [];
+  return documents.map(mapCitizenDocument);
 };
 
 const buildReferenceId = () => {
@@ -213,7 +229,18 @@ export const complaintController = {
             priority: aiResult?.priority,
             hasComplaintDraft: Boolean(aiResult?.complaint_draft),
             hasRtiDraft: Boolean(aiResult?.rti_draft),
+            hasComplaintPdf: Boolean(aiResult?.complaint_pdf),
+            complaintPdfBase64Size: aiResult?.complaint_pdf ? String(aiResult.complaint_pdf).length : 0,
+            hasRtiPdf: Boolean(aiResult?.rti_pdf),
+            rtiPdfBase64Size: aiResult?.rti_pdf ? String(aiResult.rti_pdf).length : 0,
             documentValid: aiResult?.document_valid,
+          })
+        );
+        logger.info(
+          `Generated PDF payload received from AI for complaint ${complaint.id}`,
+          JSON.stringify({
+            complaintPdfReceived: Boolean(aiResult?.complaint_pdf),
+            rtiPdfReceived: Boolean(aiResult?.rti_pdf),
           })
         );
       } catch (aiError) {
@@ -247,11 +274,27 @@ export const complaintController = {
         JSON.stringify({ requested: uploadedFiles.length, saved: savedAttachments.length })
       );
 
+      const savedDocuments = await documentService.persistGeneratedDocuments({
+        complaintId: complaint.id,
+        referenceId: complaint.reference_id,
+        aiResult,
+        department: aiResult?.department || routingDecision.departmentName,
+      });
+      logger.info(
+        `Document persistence complete for complaint ${complaint.id}`,
+        JSON.stringify({
+          hasComplaintDraft: Boolean(aiResult?.complaint_draft),
+          hasRtiDraft: Boolean(aiResult?.rti_draft),
+          savedDocumentCount: savedDocuments.length,
+        })
+      );
+
       const aiAuditPayload = {
         ...aiResult,
         routing_info: actionPlan.routing_info,
         routing_recommendations: routingRecommendations,
         attachments: savedAttachments,
+        documents: savedDocuments,
         ai_analysis: {
           ...aiResult,
           routing_info: actionPlan.routing_info,
@@ -264,6 +307,7 @@ export const complaintController = {
             action: 'completed',
           },
           attachments: savedAttachments,
+          documents: savedDocuments,
           input: {
             text: resolvedDescription,
             location,
@@ -329,6 +373,14 @@ export const complaintController = {
         status: actionPlan.status,
       });
 
+      if (savedDocuments.length > 0) {
+        await actionAgentService.createTimelineEntry({
+          complaintId: complaint.id,
+          note: `Complaint letter generated and routed to ${actionPlan.routing_info?.departmentName || 'department'}`,
+          status: actionPlan.status,
+        });
+      }
+
       res.status(201).json({
         success: true,
         caseId: updatedComplaint?.reference_id || complaint.id,
@@ -346,6 +398,7 @@ export const complaintController = {
         },
         complaint: updatedComplaint,
         attachments: savedAttachments,
+        documents: mapCitizenDocuments(savedDocuments),
       });
     } catch (error) {
       next(error);
@@ -396,9 +449,12 @@ export const complaintController = {
 
       if (error) throw error;
       const attachments = await attachmentService.getComplaintAttachments(id);
+      const documents = await documentService.getComplaintDocuments(id);
+      const fallbackDocuments = Array.isArray(data?.ai_analysis?.documents) ? data.ai_analysis.documents : [];
       res.json({
         ...data,
         attachments,
+        documents: mapCitizenDocuments(documents.length > 0 ? documents : fallbackDocuments),
       });
     } catch (error) {
       next(error);
@@ -456,6 +512,8 @@ export const complaintController = {
         logger.warn(`Status history fetch failed for complaint ${complaint.id}:`, historyError.message);
       }
 
+      const documents = await documentService.getComplaintDocuments(complaint.id);
+
       const timeline = (history || []).map((entry) => ({
         status: entry.new_status || complaint.status || 'new',
         note: entry.notes || '',
@@ -483,6 +541,7 @@ export const complaintController = {
           progress_percentage: safeProgress,
           latest_update: latestUpdate?.at || safeLastUpdated,
           latest_note: latestUpdate?.note || '',
+          documents: mapCitizenDocuments(documents),
           timeline,
         },
       });

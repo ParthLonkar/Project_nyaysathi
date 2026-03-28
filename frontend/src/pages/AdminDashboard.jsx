@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api.js';
+<<<<<<< HEAD
 import DailyReport from '../components/DailyReport.jsx';
+=======
+import GeneratedDocumentsPanel from '../components/GeneratedDocumentsPanel';
+>>>>>>> c3d1cc5 (feat: Add complaint PDF genration)
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -922,6 +926,13 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
+
+                  <GeneratedDocumentsPanel
+                    documents={selectedComplaint.documents || selectedComplaint.ai_analysis?.documents || []}
+                    complaintDraftText={selectedComplaint.ai_analysis?.complaint_draft || ''}
+                    rtiDraftText={selectedComplaint.ai_analysis?.rti_draft || ''}
+                    compact
+                  />
                 </div>
 
                 {/* Detail Footer */}

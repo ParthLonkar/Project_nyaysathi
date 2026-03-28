@@ -37,11 +37,20 @@ export const staffService = {
             title,
             description,
             category,
+            department,
             priority,
             status,
             progress_percentage,
             sla_days,
+<<<<<<< HEAD
             submitted_at
+=======
+            submitted_at,
+            citizen_name,
+            citizen_phone,
+            citizen_email,
+            ai_analysis
+>>>>>>> c3d1cc5 (feat: Add complaint PDF genration)
           )
         `)
         .eq('staff_id', staffId)
@@ -114,7 +123,25 @@ export const staffService = {
         return { success: false, error: 'You are not assigned to this complaint' };
       }
 
-      return { success: true, complaint };
+      const { data: documents, error: documentError } = await supabase
+        .from('complaint_documents')
+        .select('id, complaint_id, document_type, file_name, storage_path, public_url, created_at')
+        .eq('complaint_id', complaintId)
+        .order('created_at', { ascending: false });
+
+      if (documentError) {
+        logger.warn(`Get complaint documents warning (${complaintId}):`, documentError.message);
+      }
+
+      return {
+        success: true,
+        complaint: {
+          ...complaint,
+          documents: (documents && documents.length > 0)
+            ? documents
+            : (complaint?.ai_analysis?.documents || []),
+        },
+      };
     } catch (error) {
       logger.error('Get complaint details error:', error);
       return { success: false, error: 'Failed to fetch complaint' };

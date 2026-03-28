@@ -1,13 +1,17 @@
 from fastapi import APIRouter, HTTPException
 from app.services.supabase_service import get_complaint, save_complaint_analysis
-from app.graph.complaint_graph import create_complaint_graph, format_result
 from app.graph.state import ComplaintState
 from app.utils.logger import log_info, log_error
 
 router = APIRouter()
 
-# Initialize the complaint processing graph
-complaint_graph = create_complaint_graph()
+def _load_graph():
+    try:
+        from app.graph.complaint_graph import create_complaint_graph, format_result
+        return create_complaint_graph(), format_result
+    except Exception as error:
+        log_error("LangGraph initialization failed", error)
+        return None, None
 
 
 @router.post("/process")
@@ -25,6 +29,13 @@ async def process_complaint(complaint_data: dict):
             description=complaint_data.get('description'),
             category=complaint_data.get('category'),
         )
+
+        complaint_graph, format_result = _load_graph()
+        if complaint_graph is None or format_result is None:
+            raise HTTPException(
+                status_code=503,
+                detail="AI graph dependencies not available. Install/update langgraph stack and retry.",
+            )
         
         # Run the graph
         final_state = complaint_graph.invoke(initial_state)

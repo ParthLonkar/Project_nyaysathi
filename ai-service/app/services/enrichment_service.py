@@ -17,8 +17,9 @@ def build_ai_enrichment(
     location: str,
     category_hint: Optional[str] = None,
     priority_hint: Optional[str] = None,
+    legal_override: Optional[dict] = None,
 ) -> dict:
-    legal = analyze_legal_intelligence(text=text or "", location=location or "")
+    legal = legal_override or analyze_legal_intelligence(text=text or "", location=location or "")
     legal = _merge_legal_hints(legal, category_hint=category_hint, priority_hint=priority_hint)
     category = legal.get("category", "general")
     department = legal.get("department", "Municipal Grievance Cell")
