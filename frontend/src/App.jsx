@@ -27,6 +27,7 @@ function App() {
           <Route path="/portals" element={<PortalSelection />} />
           <Route path="/submit" element={<SubmitComplaint />} />
           <Route path="/submission-confirmation" element={<SubmissionConfirmation />} />
+          <Route path="/track" element={<CaseTracking />} />
           <Route path="/track/:complaintId" element={<CaseTracking />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/complaint/:id" element={<ComplaintDetails />} />

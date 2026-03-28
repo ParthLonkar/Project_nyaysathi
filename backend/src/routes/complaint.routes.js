@@ -6,6 +6,7 @@ import { uploadComplaintAttachments } from '../middleware/complaint-upload.middl
 const router = express.Router();
 
 router.post('/', uploadComplaintAttachments, complaintController.createComplaint);
+router.get('/track/:referenceId', complaintController.trackComplaintByReference);
 router.get('/my', authenticate, complaintController.getUserComplaints);
 router.get('/', authenticate, complaintController.getAllComplaints);
 router.get('/:id', authenticate, complaintController.getComplaintById);

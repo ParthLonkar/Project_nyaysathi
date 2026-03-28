@@ -4,6 +4,8 @@ import { supabaseAdmin } from '../config/supabase.js';
 import { attachmentService } from '../services/attachment.service.js';
 import { routeComplaint, generateRoutingRecommendations } from '../services/routing.service.js';
 
+const REFERENCE_ID_REGEX = /^Ref-\d{4}-\d{6}$/;
+
 const buildResolvedTitle = (title, description) => {
   if (title && String(title).trim()) return String(title).trim();
   if (description && String(description).trim()) {
@@ -23,6 +25,52 @@ const parseMetadataAttachments = (attachmentsMeta) => {
     }
   }
   return [];
+};
+
+const deriveProgressFromStatus = (status = 'new') => {
+  const key = String(status || 'new').toLowerCase();
+  const map = {
+    new: 10,
+    submitted: 10,
+    routed: 25,
+    received: 35,
+    assigned: 50,
+    in_review: 60,
+    in_progress: 70,
+    processing: 70,
+    escalated: 80,
+    resolved: 100,
+    closed: 100,
+  };
+  return map[key] ?? 20;
+};
+
+const buildReferenceId = () => {
+  const year = new Date().getFullYear();
+  const randomSix = Math.floor(100000 + Math.random() * 900000);
+  return `Ref-${year}-${randomSix}`;
+};
+
+const generateUniqueReferenceId = async (attempts = 8) => {
+  for (let i = 0; i < attempts; i += 1) {
+    const candidate = buildReferenceId();
+    const { data, error } = await supabaseAdmin
+      .from('complaints')
+      .select('id')
+      .eq('reference_id', candidate)
+      .maybeSingle();
+
+    if (error) {
+      logger.warn('Reference ID uniqueness check failed, proceeding with generated value:', error.message);
+      return candidate;
+    }
+
+    if (!data) {
+      return candidate;
+    }
+  }
+
+  return `Ref-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
 };
 
 const mapTopLevelAiFields = (aiResult = {}, fallbackInput = {}, routingDecision = {}) => {
@@ -102,6 +150,7 @@ export const complaintController = {
 
       const baseComplaintPayload = {
         user_id: resolvedUserId,
+        reference_id: await generateUniqueReferenceId(),
         title: resolvedTitle,
         description: resolvedDescription,
         location,
@@ -264,7 +313,7 @@ export const complaintController = {
 
       res.status(201).json({
         success: true,
-        caseId: complaint.id,
+        caseId: updatedComplaint?.reference_id || complaint.id,
         aiResult: { ...aiResult, routing_info: routingDecision, routing_recommendations: routingRecommendations },
         complaint: updatedComplaint,
         attachments: savedAttachments,
@@ -321,6 +370,92 @@ export const complaintController = {
       res.json({
         ...data,
         attachments,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  trackComplaintByReference: async (req, res, next) => {
+    try {
+      const { referenceId } = req.params;
+      const trimmedReferenceId = String(referenceId || '').trim();
+
+      if (!REFERENCE_ID_REGEX.test(trimmedReferenceId)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Invalid reference ID format. Expected format: Ref-YYYY-XXXXXX',
+            format: 'Ref-2026-123456',
+          },
+        });
+      }
+
+      const { data: complaint, error } = await supabaseAdmin
+        .from('complaints')
+        .select(`
+          id,
+          reference_id,
+          status,
+          category,
+          department,
+          priority,
+          summary,
+          created_at,
+          submitted_at,
+          progress_percentage
+        `)
+        .eq('reference_id', trimmedReferenceId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!complaint) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'No complaint found for this reference ID.' },
+        });
+      }
+
+      const { data: history, error: historyError } = await supabaseAdmin
+        .from('status_history')
+        .select('new_status, notes, created_at')
+        .eq('complaint_id', complaint.id)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (historyError) {
+        logger.warn(`Status history fetch failed for complaint ${complaint.id}:`, historyError.message);
+      }
+
+      const timeline = (history || []).map((entry) => ({
+        status: entry.new_status || complaint.status || 'new',
+        note: entry.notes || '',
+        at: entry.created_at,
+      }));
+
+      const latestUpdate = timeline[0] || null;
+      const safeProgress = typeof complaint.progress_percentage === 'number'
+        ? complaint.progress_percentage
+        : deriveProgressFromStatus(complaint.status);
+      const safeLastUpdated = complaint.submitted_at || complaint.created_at || null;
+
+      return res.json({
+        success: true,
+        complaint: {
+          reference_id: complaint.reference_id,
+          status: complaint.status || 'new',
+          category: complaint.category || 'general',
+          department: complaint.department || 'Pending routing',
+          priority: complaint.priority || 'medium',
+          summary: complaint.summary || 'No summary available yet.',
+          created_at: complaint.created_at || null,
+          submitted_at: complaint.submitted_at || complaint.created_at || null,
+          updated_at: safeLastUpdated,
+          progress_percentage: safeProgress,
+          latest_update: latestUpdate?.at || safeLastUpdated,
+          latest_note: latestUpdate?.note || '',
+          timeline,
+        },
       });
     } catch (error) {
       next(error);

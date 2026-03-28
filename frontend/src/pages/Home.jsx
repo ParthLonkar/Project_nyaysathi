@@ -10,7 +10,7 @@ export default function Home() {
   const handleTrackComplaint = (e) => {
     e.preventDefault();
     if (trackingId.trim()) {
-      navigate(`/track/${trackingId}`);
+      navigate(`/track/${encodeURIComponent(trackingId.trim())}`);
     }
   };
 

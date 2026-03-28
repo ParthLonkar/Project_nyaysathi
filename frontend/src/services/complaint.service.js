@@ -63,6 +63,11 @@ export const complaintService = {
     return response.data;
   },
 
+  trackByReferenceId: async (referenceId) => {
+    const response = await api.get(`/complaints/track/${encodeURIComponent(referenceId)}`);
+    return response.data;
+  },
+
   updateComplaintStatus: async (id, status) => {
     const response = await api.patch(`/complaints/${id}/status`, { status });
     return response.data;
