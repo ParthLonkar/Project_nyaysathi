@@ -1,6 +1,6 @@
 # NyaySathi AI Service
 
-Python FastAPI service for processing legal complaints using LangGraph and OpenAI.
+Python FastAPI service for processing legal complaints using LangGraph and Google Gemini.
 
 ## Setup
 

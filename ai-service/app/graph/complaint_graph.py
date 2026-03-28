@@ -17,15 +17,15 @@ def create_complaint_graph():
 
     # Add nodes
     graph.add_node("intake", intake_agent.process_intake)
-    graph.add_node("legal_analysis", legal_agent.perform_legal_analysis)
+    graph.add_node("legal_analysis_node", legal_agent.perform_legal_analysis)
     graph.add_node("drafting", drafting_agent.draft_document)
     graph.add_node("compliance", compliance_agent.check_compliance)
     graph.add_node("priority", priority_agent.assess_priority)
     graph.add_node("action", action_agent.recommend_actions)
 
     # Add edges
-    graph.add_edge("intake", "legal_analysis")
-    graph.add_edge("legal_analysis", "drafting")
+    graph.add_edge("intake", "legal_analysis_node")
+    graph.add_edge("legal_analysis_node", "drafting")
     graph.add_edge("drafting", "compliance")
     graph.add_edge("compliance", "priority")
     graph.add_edge("priority", "action")

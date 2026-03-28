@@ -3,9 +3,9 @@ from typing import Optional
 
 
 class Settings(BaseSettings):
-    # OpenAI Settings
-    OPENAI_API_KEY: str
-    OPENAI_MODEL: str = "gpt-4"
+    # Google Gemini Settings
+    GEMINI_API_KEY: str
+    GEMINI_MODEL: str = "gemini-pro"
     
     # Supabase Settings
     SUPABASE_URL: str

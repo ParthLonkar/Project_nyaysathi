@@ -1,10 +1,10 @@
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from app.config.settings import Settings
 
 settings = Settings()
-llm = ChatOpenAI(
-    api_key=settings.OPENAI_API_KEY,
-    model="gpt-4",
+llm = ChatGoogleGenerativeAI(
+    api_key=settings.GEMINI_API_KEY,
+    model=settings.GEMINI_MODEL,
     temperature=0.7,
 )
 

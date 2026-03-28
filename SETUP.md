@@ -6,8 +6,7 @@
 2. **Python** (3.11+) - [Download](https://python.org/)
 3. **Git** - [Download](https://git-scm.com/)
 4. **Supabase Account** - [Sign up](https://supabase.com/)
-5. **OpenAI API Key** - [Get key](https://platform.openai.com/api-keys)
-6. **Docker** (optional) - [Download](https://docker.com/)
+5. **Google Gemini API Key** - [Get key](https://aistudio.google.com/app/apikey)
 
 ## Step 1: Clone & Install Dependencies
 
@@ -35,11 +34,11 @@ pip install -r ai-service/requirements.txt
    - Run `supabase/schema.sql`
    - Run `supabase/rls_policies.sql`
 
-### 2.2 OpenAI Setup
+### 2.2 Google Gemini Setup
 
-1. Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
 2. Create a new API key
-3. Copy it as `OPENAI_API_KEY`
+3. Copy it as `GEMINI_API_KEY`
 
 ### 2.3 Generate JWT Secret
 
@@ -79,7 +78,7 @@ LOG_LEVEL=info
 
 **ai-service/.env**
 ```env
-OPENAI_API_KEY=your_openai_key_here
+GEMINI_API_KEY=your_gemini_key_here
 
 SUPABASE_URL=your_supabase_url_here
 SUPABASE_KEY=your_supabase_key_here
@@ -93,7 +92,7 @@ LOG_LEVEL=INFO
 
 ## Step 3: Start Services
 
-### Option A: Local Development
+Open three terminal windows in the project root and run:
 
 **Terminal 1 - Frontend**
 ```bash
@@ -115,17 +114,6 @@ cd ai-service
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 python -m uvicorn api.main:app --reload
 # AI service runs on http://localhost:8000
-```
-
-### Option B: Docker Compose
-
-```bash
-# Create .env file in root with all configuration
-docker-compose up
-
-# Frontend: http://localhost:5173
-# Backend: http://localhost:3000
-# AI Service: http://localhost:8000
 ```
 
 ## Step 4: Test the Application
@@ -165,7 +153,7 @@ kill -9 <PID>
 - Verify RLS policies are enabled
 
 ### AI Service Not Responding
-- Ensure `OPENAI_API_KEY` is valid
+- Ensure `GEMINI_API_KEY` is valid
 - Check Python dependencies: `pip install -r requirements.txt`
 - Verify FastAPI server is running on `http://localhost:8000/api/health`
 
