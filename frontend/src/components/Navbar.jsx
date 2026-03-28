@@ -34,7 +34,7 @@ export default function Navbar() {
           </Link>
           <button
             onClick={() => {
-              const id = prompt('Enter your Complaint ID:\n(e.g., NYA-12345678)');
+              const id = prompt('Enter your Complaint Reference ID:');
               if (id) navigate(`/track/${id}`);
             }}
             className="text-slate-600 hover:text-blue-900 transition-colors px-3 py-1.5 rounded-lg hover:bg-blue-50"
@@ -84,7 +84,7 @@ export default function Navbar() {
           </Link>
           <button
             onClick={() => {
-              const id = prompt('Enter your Complaint ID:\n(e.g., NYA-12345678)');
+              const id = prompt('Enter your Complaint Reference ID:');
               if (id) navigate(`/track/${id}`);
             }}
             className="block w-full text-left text-slate-600 hover:text-blue-900 transition-colors font-semibold px-3 py-2 rounded-lg hover:bg-blue-50"
@@ -102,3 +102,4 @@ export default function Navbar() {
     </nav>
   );
 }
+

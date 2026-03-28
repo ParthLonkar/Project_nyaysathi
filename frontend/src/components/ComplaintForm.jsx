@@ -47,17 +47,20 @@ export default function ComplaintForm() {
         attachments,
       });
 
+      const complaintRefId = response?.caseId || response?.complaint?.id;
+
       navigate('/submission-confirmation', {
         state: {
           complaint: {
-            complaintId: response?.caseId || `NYA-${Date.now().toString().slice(-8)}`,
-            submittedAt: new Date().toISOString(),
+            complaintId: complaintRefId || null,
+            submittedAt: response?.complaint?.created_at || new Date().toISOString(),
             complaintText,
             name,
             phone,
             location,
             attachments,
             aiResult: response?.aiResult || null,
+            rawComplaint: response?.complaint || null,
             citizen_update: response?.aiResult?.citizen_update || null,
           },
         },
