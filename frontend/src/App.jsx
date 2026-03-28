@@ -11,6 +11,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
 import StaffLogin from './pages/StaffLogin';
 import StaffWorkspace from './pages/StaffWorkspace';
+import StaffTasks from './pages/StaffTasks';
+import StaffCaseDetails from './pages/StaffCaseDetails';
 import ComplaintDetails from './pages/ComplaintDetails';
 import CaseTracking from './pages/CaseTracking';
 import SubmissionConfirmation from './pages/SubmissionConfirmation';
@@ -44,6 +46,9 @@ function App() {
           {/* Staff Routes */}
           <Route path="/staff/login" element={<StaffLogin />} />
           <Route path="/staff/workspace" element={<StaffWorkspace />} />
+          <Route path="/staff/dashboard" element={<StaffWorkspace />} />
+          <Route path="/staff/task" element={<StaffTasks />} />
+          <Route path="/staff/case/:id" element={<StaffCaseDetails />} />
         </Routes>
       </AuthProvider>
     </Router>
