@@ -54,6 +54,13 @@ const uploadFileToStorage = async (complaintId, file) => {
 export const attachmentService = {
   persistAttachments: async (complaintId, uploadedFiles = [], metadataOnlyAttachments = []) => {
     const persisted = [];
+    logger.info(
+      `Attachment persistence start for complaint ${complaintId}`,
+      JSON.stringify({
+        uploadedFileCount: Array.isArray(uploadedFiles) ? uploadedFiles.length : 0,
+        metadataCount: Array.isArray(metadataOnlyAttachments) ? metadataOnlyAttachments.length : 0,
+      })
+    );
 
     if (!Array.isArray(uploadedFiles) || uploadedFiles.length === 0) {
       if (Array.isArray(metadataOnlyAttachments) && metadataOnlyAttachments.length > 0) {
@@ -70,6 +77,10 @@ export const attachmentService = {
     for (const file of uploadedFiles) {
       try {
         const { storagePath, publicUrl } = await uploadFileToStorage(complaintId, file);
+        logger.info(
+          `Attachment storage upload success for complaint ${complaintId}`,
+          JSON.stringify({ fileName: file.originalname, storagePath })
+        );
 
         const row = {
           complaint_id: complaintId,
@@ -91,6 +102,10 @@ export const attachmentService = {
         }
 
         persisted.push(data);
+        logger.info(
+          `Attachment DB row insert success for complaint ${complaintId}`,
+          JSON.stringify({ attachmentId: data?.id, fileName: data?.file_name })
+        );
       } catch (error) {
         if (isRlsError(error)) {
           logger.warn(`Attachment DB write blocked by RLS for complaint ${complaintId}; using metadata-only fallback.`);

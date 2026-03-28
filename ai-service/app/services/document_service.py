@@ -65,8 +65,13 @@ def _department_line(department: Optional[str]) -> str:
     return department or "Municipal Grievance Cell"
 
 
-def generate_complaint_draft(text: str, department: Optional[str], location: Optional[str]) -> str:
-    improved = improve_text(text)
+def generate_complaint_draft(
+    text: str,
+    department: Optional[str],
+    location: Optional[str],
+    pre_improved_text: Optional[str] = None,
+) -> str:
+    improved = pre_improved_text or improve_text(text)
     dept = _department_line(department)
     loc = location or "the reported area"
 
@@ -101,8 +106,12 @@ Return only the final draft text, no markdown.
     )
 
 
-def generate_rti_draft(text: str, department: Optional[str]) -> str:
-    improved = improve_text(text)
+def generate_rti_draft(
+    text: str,
+    department: Optional[str],
+    pre_improved_text: Optional[str] = None,
+) -> str:
+    improved = pre_improved_text or improve_text(text)
     dept = _department_line(department)
 
     prompt = f"""
@@ -164,8 +173,8 @@ def build_document_intelligence(
     include_rti: bool = True,
 ) -> dict:
     improved = improve_text(text)
-    complaint_draft = generate_complaint_draft(text, department, location)
-    rti_draft = generate_rti_draft(text, department) if include_rti else ""
+    complaint_draft = generate_complaint_draft(text, department, location, pre_improved_text=improved)
+    rti_draft = generate_rti_draft(text, department, pre_improved_text=improved) if include_rti else ""
     validation = validate_document(complaint_draft)
 
     return {
