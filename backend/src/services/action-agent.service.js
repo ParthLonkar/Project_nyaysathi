@@ -53,13 +53,13 @@ export const actionAgentService = {
     };
   },
 
-  createInitialTimelineEntry: async ({ complaintId, note, status }) => {
+  createTimelineEntry: async ({ complaintId, note, status, oldStatus = null }) => {
     try {
       const { error } = await supabaseAdmin
         .from('status_history')
         .insert({
           complaint_id: complaintId,
-          old_status: null,
+          old_status: oldStatus,
           new_status: status || DEFAULT_STATUS,
           notes: note,
           created_at: new Date().toISOString(),
@@ -76,5 +76,14 @@ export const actionAgentService = {
       logger.warn(`Action Agent timeline insert error for complaint ${complaintId}:`, error.message);
       return false;
     }
+  },
+
+  createInitialTimelineEntry: async ({ complaintId, note, status }) => {
+    return actionAgentService.createTimelineEntry({
+      complaintId,
+      note,
+      status,
+      oldStatus: null,
+    });
   },
 };

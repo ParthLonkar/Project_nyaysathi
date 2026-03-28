@@ -1,4 +1,4 @@
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, START, END
 from datetime import datetime
 from app.graph.state import ComplaintState, ComplaintInput
 from app.agents import (
@@ -54,8 +54,8 @@ def create_complaint_graph():
     graph.add_edge("compliance", "priority")
     graph.add_edge("priority", "action")
 
-    graph.set_entry_point("intake")
-    graph.set_finish_point("action")
+    graph.add_edge(START, "intake")
+    graph.add_edge("action", END)
 
     return graph.compile()
 

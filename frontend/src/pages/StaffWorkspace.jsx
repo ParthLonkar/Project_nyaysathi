@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api.js';
+import GeneratedDocumentsPanel from '../components/GeneratedDocumentsPanel';
 
 export default function StaffWorkspace() {
   const navigate = useNavigate();
@@ -78,6 +79,12 @@ export default function StaffWorkspace() {
         };
       });
   }, [complaints]);
+
+  const complaintDocuments = selectedComplaint?.documents
+    || selectedComplaint?.ai_analysis?.documents
+    || [];
+  const staffComplaintDraft = selectedComplaint?.ai_analysis?.complaint_draft || '';
+  const staffRtiDraft = selectedComplaint?.ai_analysis?.rti_draft || '';
 
   if (!staff) {
     return (
@@ -184,8 +191,179 @@ export default function StaffWorkspace() {
                 <p className="text-xs font-bold text-emerald-950 leading-tight">{staffName}</p>
                 <p className="text-[10px] text-slate-500 uppercase font-semibold">{staffRole}</p>
               </div>
+<<<<<<< HEAD
               <div className="w-9 h-9 rounded-full bg-primary-fixed/40 flex items-center justify-center text-primary shadow-sm">
                 <span className="material-symbols-outlined">person</span>
+=======
+
+              {/* Complaint Details */}
+              <div className="lg:col-span-2">
+                {selectedComplaint ? (
+                  <div className="bg-white rounded-lg shadow">
+                    {/* Complaint Header */}
+                    <div className="p-6 border-b">
+                      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        {selectedComplaint.title}
+                      </h2>
+                      <div className="flex gap-2 mb-4">
+                        <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
+                          selectedComplaint.priority === 'high'
+                            ? 'bg-red-100 text-red-800'
+                            : selectedComplaint.priority === 'medium'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {selectedComplaint.priority.toUpperCase()}
+                        </span>
+                        <span className="px-3 py-1 rounded-lg text-sm font-semibold bg-blue-100 text-blue-800">
+                          {selectedComplaint.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-gray-600">{selectedComplaint.description}</p>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="border-b flex">
+                      <button
+                        onClick={() => setTabs('details')}
+                        className={`flex-1 px-4 py-3 font-semibold text-center ${
+                          tabs === 'details'
+                            ? 'border-b-2 border-green-600 text-green-600'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        Details
+                      </button>
+                      <button
+                        onClick={() => setTabs('notes')}
+                        className={`flex-1 px-4 py-3 font-semibold text-center ${
+                          tabs === 'notes'
+                            ? 'border-b-2 border-green-600 text-green-600'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        Notes & Updates
+                      </button>
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className="p-6">
+                      {tabs === 'details' && (
+                        <div className="space-y-4">
+                          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <p className="text-sm text-emerald-800 font-semibold mb-1">Staff Action Note</p>
+                            <p className="text-sm text-emerald-900">
+                              {selectedComplaint.ai_analysis?.staff_action_note || 'No staff action note available yet.'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Category</p>
+                            <p className="font-semibold text-gray-900">{selectedComplaint.category}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Submitted Date</p>
+                            <p className="font-semibold text-gray-900">
+                              {new Date(selectedComplaint.submitted_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">SLA Days</p>
+                            <p className="font-semibold text-gray-900">{selectedComplaint.sla_days} days</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Progress</p>
+                            <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-green-600 h-2 rounded-full"
+                                style={{ width: `${selectedComplaint.progress_percentage}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-sm font-semibold text-gray-900 mt-1">
+                              {selectedComplaint.progress_percentage}%
+                            </p>
+                          </div>
+                          <GeneratedDocumentsPanel
+                            documents={complaintDocuments}
+                            complaintDraftText={staffComplaintDraft}
+                            rtiDraftText={staffRtiDraft}
+                            compact
+                          />
+                        </div>
+                      )}
+
+                      {tabs === 'notes' && (
+                        <div className="space-y-6">
+                          {/* Status Update */}
+                          <div className="bg-gray-50 p-4 rounded-lg border">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Update Status
+                            </label>
+                            <select
+                              value={statusUpdate}
+                              onChange={(e) => setStatusUpdate(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                            >
+                              <option value="">Select new status</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="resolved">Resolved</option>
+                              <option value="pending_review">Pending Review</option>
+                            </select>
+                            <button
+                              onClick={handleUpdateStatus}
+                              disabled={!statusUpdate}
+                              className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+                            >
+                              Update Status
+                            </button>
+                          </div>
+
+                          {/* Complaint Notes */}
+                          {selectedComplaint.complaint_notes && selectedComplaint.complaint_notes.length > 0 && (
+                            <div>
+                              <h3 className="font-semibold text-gray-900 mb-3">Previous Notes</h3>
+                              <div className="space-y-3">
+                                {selectedComplaint.complaint_notes.map(note => (
+                                  <div key={note.id} className="bg-gray-50 p-3 rounded-lg border">
+                                    <p className="text-sm text-gray-700">{note.note_text}</p>
+                                    <p className="text-xs text-gray-600 mt-2">
+                                      - {note.created_by_name} on {new Date(note.created_at).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Add Note */}
+                          <div className="bg-green-50 p-4 rounded-lg border">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              Add Note
+                            </label>
+                            <textarea
+                              value={noteText}
+                              onChange={(e) => setNoteText(e.target.value)}
+                              placeholder="Add your notes or updates..."
+                              rows="4"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2"
+                            ></textarea>
+                            <button
+                              onClick={handleAddNote}
+                              disabled={!noteText.trim()}
+                              className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
+                            >
+                              Add Note
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg shadow p-12 text-center">
+                    <p className="text-gray-600">Select a complaint to view details</p>
+                  </div>
+                )}
+>>>>>>> c3d1cc5 (feat: Add complaint PDF genration)
               </div>
             </div>
           </div>

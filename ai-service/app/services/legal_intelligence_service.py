@@ -360,9 +360,9 @@ Current decision: {json.dumps(base, ensure_ascii=True)}
         return base
 
 
-def analyze_legal_intelligence(text: str, location: str = "") -> dict[str, Any]:
+def analyze_legal_intelligence(text: str, location: str = "", allow_llm_refinement: bool = True) -> dict[str, Any]:
     base = _deterministic_analysis(text=text, location=location)
-    refined = _llm_refine_if_needed(base, text=text, location=location)
+    refined = _llm_refine_if_needed(base, text=text, location=location) if allow_llm_refinement else base
 
     # Final safety normalization
     refined["category"] = refined.get("category") or FALLBACK_CATEGORY

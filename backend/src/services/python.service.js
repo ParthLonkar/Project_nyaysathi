@@ -53,6 +53,8 @@ const normalizeAIResult = (aiData, sourceText = '', sourceLocation = '') => {
     manual_review: aiData?.manual_review === true,
     complaint_draft: aiData?.complaint_draft || '',
     rti_draft: aiData?.rti_draft || '',
+    complaint_pdf: aiData?.complaint_pdf || null,
+    rti_pdf: aiData?.rti_pdf || null,
     document_valid: aiData?.document_valid === true,
     document_notes: aiData?.document_notes || '',
     legal_analysis: aiData?.legal_analysis || {},

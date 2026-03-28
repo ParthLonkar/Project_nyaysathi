@@ -3,6 +3,7 @@ from app.services.prompt_templates import DRAFTING_PROMPT
 from app.services.document_service import build_document_intelligence
 from app.services.pdf_generator import generate_rti_pdf, generate_complaint_draft_pdf
 from app.agents.agent_utils import build_agent_flow, merge_dict, normalize_text
+from app.utils.logger import log_error, log_info
 
 
 async def draft_document(state):
@@ -11,6 +12,15 @@ async def draft_document(state):
     legal_analysis = getattr(state, "legal_analysis", {}) or {}
     department = legal_analysis.get("department")
     location = legal_analysis.get("location")
+    log_info(
+        "Drafting started",
+        extra={
+            "complaint_id": getattr(state, "complaint_id", None),
+            "has_description": bool(description),
+            "department": department,
+            "location": location,
+        },
+    )
 
     bundle = build_document_intelligence(
         text=description,
@@ -30,6 +40,10 @@ async def draft_document(state):
         llm_draft = normalize_text(getattr(response, "content", ""))
     except Exception:
         llm_draft = ""
+        log_info(
+            "Drafting LLM unavailable; using structured fallback drafts",
+            extra={"complaint_id": getattr(state, "complaint_id", None)},
+        )
 
     state.improved_text = bundle.get("improved_text")
     state.complaint_draft = bundle.get("complaint_draft")
@@ -38,32 +52,43 @@ async def draft_document(state):
     state.document_notes = bundle.get("document_notes")
     state.draft_document = llm_draft or state.complaint_draft
 
-    # Generate PDF documents
+    # Generate PDF documents (best-effort; never block text drafting flow)
+    complaint_data = {
+        "complaint_id": getattr(state, "complaint_id", "Not Assigned"),
+        "title": getattr(state, "title", "Citizen Complaint"),
+        "description": description,
+        "customer_name": getattr(state, "customer_name", "Not Provided"),
+        "email": getattr(state, "email", "Not Provided"),
+        "phone": getattr(state, "phone", "Not Provided"),
+        "location": location or "Not Provided",
+        "address": getattr(state, "address", "Not Provided"),
+        "aadhaar": getattr(state, "aadhaar", "Not Provided"),
+        "department": department or "Concerned Department"
+    }
+
+    state.rti_pdf = None
+    state.complaint_pdf = None
+
     try:
-        complaint_data = {
-            "complaint_id": getattr(state, "complaint_id", "Not Assigned"),
-            "title": getattr(state, "title", "Citizen Complaint"),
-            "description": description,
-            "customer_name": getattr(state, "customer_name", "Not Provided"),
-            "email": getattr(state, "email", "Not Provided"),
-            "phone": getattr(state, "phone", "Not Provided"),
-            "location": location or "Not Provided",
-            "address": getattr(state, "address", "Not Provided"),
-            "aadhaar": getattr(state, "aadhaar", "Not Provided"),
-            "department": department or "Concerned Department"
-        }
-        
-        # Generate RTI PDF
-        rti_pdf_bytes = generate_rti_pdf(complaint_data)
-        state.rti_pdf = rti_pdf_bytes
-        
-        # Generate Complaint Draft PDF
-        if state.complaint_draft:
-            complaint_pdf_bytes = generate_complaint_draft_pdf(complaint_data, state.complaint_draft)
-            state.complaint_pdf = complaint_pdf_bytes
-    except Exception as e:
+        state.rti_pdf = generate_rti_pdf(complaint_data)
+        log_info(
+            "RTI PDF generated",
+            extra={"complaint_id": getattr(state, "complaint_id", None), "bytes": len(state.rti_pdf or b"")},
+        )
+    except Exception:
         state.rti_pdf = None
-        state.complaint_pdf = None
+        log_error("RTI PDF generation failed")
+
+    if state.complaint_draft:
+        try:
+            state.complaint_pdf = generate_complaint_draft_pdf(complaint_data, state.complaint_draft)
+            log_info(
+                "Complaint PDF generated",
+                extra={"complaint_id": getattr(state, "complaint_id", None), "bytes": len(state.complaint_pdf or b"")},
+            )
+        except Exception:
+            state.complaint_pdf = None
+            log_error("Complaint PDF generation failed")
 
     updated_legal = merge_dict(legal_analysis, {
         "drafting_available": bool(state.complaint_draft),
@@ -76,4 +101,14 @@ async def draft_document(state):
     state.legal_analysis = updated_legal
 
     state.current_stage = "compliance"
+    log_info(
+        "Drafting completed",
+        extra={
+            "complaint_id": getattr(state, "complaint_id", None),
+            "has_complaint_draft": bool(state.complaint_draft),
+            "has_rti_draft": bool(state.rti_draft),
+            "has_complaint_pdf": bool(state.complaint_pdf),
+            "has_rti_pdf": bool(state.rti_pdf),
+        },
+    )
     return state

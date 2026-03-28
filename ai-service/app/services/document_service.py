@@ -2,7 +2,8 @@ import json
 import re
 from typing import Optional
 
-from app.services.openai_service import llm
+from app.services.openai_service import llm, GeminiQuotaExceeded
+from app.utils.logger import log_info
 
 
 OFFENSIVE_WORDS_MAP = {
@@ -43,22 +44,7 @@ def improve_text(text: str) -> str:
     sanitized = _sanitize_abusive_language(text)
     if not sanitized.strip():
         return "Citizen submitted an empty complaint. Manual clarification required."
-
-    prompt = f"""
-You are a civic grievance writing assistant.
-Rewrite the complaint in formal, clear, respectful English.
-Preserve factual meaning. Do not invent details.
-Return only the improved complaint text.
-
-Complaint:
-{sanitized}
-"""
-    try:
-        response = llm.invoke(prompt)
-        content = (response.content or "").strip()
-        return content or sanitized
-    except Exception:
-        return sanitized
+    return sanitized
 
 
 def _department_line(department: Optional[str]) -> str:
@@ -74,28 +60,6 @@ def generate_complaint_draft(
     improved = pre_improved_text or improve_text(text)
     dept = _department_line(department)
     loc = location or "the reported area"
-
-    prompt = f"""
-Draft a formal civic complaint letter with the exact sections:
-1) Subject
-2) To
-3) Complaint Details
-4) Requested Action
-
-Use this information:
-- Department: {dept}
-- Location: {loc}
-- Complaint text: {improved}
-
-Return only the final draft text, no markdown.
-"""
-    try:
-        response = llm.invoke(prompt)
-        content = (response.content or "").strip()
-        if content:
-            return content
-    except Exception:
-        pass
 
     return (
         f"Subject: Complaint regarding civic issue in {loc}\n\n"
@@ -113,26 +77,6 @@ def generate_rti_draft(
 ) -> str:
     improved = pre_improved_text or improve_text(text)
     dept = _department_line(department)
-
-    prompt = f"""
-Draft an RTI application with the exact sections:
-1) To: Public Information Officer
-2) Subject
-3) Information requested
-4) Applicant details (if available; otherwise write 'Not provided')
-
-Context department: {dept}
-Complaint context: {improved}
-
-Return only the final RTI draft text, no markdown.
-"""
-    try:
-        response = llm.invoke(prompt)
-        content = (response.content or "").strip()
-        if content:
-            return content
-    except Exception:
-        pass
 
     return (
         f"To: Public Information Officer, {dept}\n\n"
@@ -172,15 +116,67 @@ def build_document_intelligence(
     location: Optional[str] = None,
     include_rti: bool = True,
 ) -> dict:
-    improved = improve_text(text)
-    complaint_draft = generate_complaint_draft(text, department, location, pre_improved_text=improved)
-    rti_draft = generate_rti_draft(text, department, pre_improved_text=improved) if include_rti else ""
+    sanitized = improve_text(text)
+    dept = _department_line(department)
+    loc = location or "the reported area"
+
+    # Single LLM call for improved text + complaint draft + RTI draft + notes.
+    prompt = f"""
+You are NyaySathi Document Intelligence Agent.
+Return STRICT JSON only with keys:
+improved_text, complaint_draft, rti_draft, document_notes
+
+Rules:
+1) improved_text must keep original meaning, respectful tone.
+2) complaint_draft must include exact sections:
+   Subject
+   To
+   Complaint Details
+   Requested Action
+3) rti_draft must include exact sections:
+   To: Public Information Officer
+   Subject
+   Information requested
+   Applicant details
+4) If RTI is not needed, still return a useful short draft.
+5) No markdown fencing.
+
+Department: {dept}
+Location: {loc}
+Include RTI: {str(include_rti).lower()}
+Complaint text:
+{sanitized}
+"""
+
+    payload = None
+    try:
+        response = llm.invoke(prompt)
+        payload = _extract_json((getattr(response, "content", "") or "").strip())
+    except GeminiQuotaExceeded:
+        log_info("Fallback drafting used due to Gemini quota exhaustion")
+    except Exception:
+        log_info("Fallback drafting used due to Gemini invocation failure")
+
+    improved = (payload or {}).get("improved_text") if isinstance(payload, dict) else None
+    complaint_draft = (payload or {}).get("complaint_draft") if isinstance(payload, dict) else None
+    rti_draft = (payload or {}).get("rti_draft") if isinstance(payload, dict) else None
+    llm_document_notes = (payload or {}).get("document_notes") if isinstance(payload, dict) else None
+
+    improved = (improved or sanitized).strip()
+    complaint_draft = (complaint_draft or generate_complaint_draft(text, department, location, pre_improved_text=improved)).strip()
+    rti_draft = (
+        (rti_draft or generate_rti_draft(text, department, pre_improved_text=improved)).strip()
+        if include_rti
+        else ""
+    )
+
     validation = validate_document(complaint_draft)
+    final_notes = llm_document_notes or validation["document_notes"]
 
     return {
         "improved_text": improved,
         "complaint_draft": complaint_draft,
         "rti_draft": rti_draft,
         "document_valid": validation["document_valid"],
-        "document_notes": validation["document_notes"],
+        "document_notes": final_notes,
     }

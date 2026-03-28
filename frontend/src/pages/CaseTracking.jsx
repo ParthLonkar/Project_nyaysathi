@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { complaintService } from '../services/complaint.service';
+import GeneratedDocumentsPanel from '../components/GeneratedDocumentsPanel';
 
 const REFERENCE_ID_REGEX = /^Ref-\d{4}-\d{6}$/;
 
@@ -194,6 +195,11 @@ export default function CaseTracking() {
                   ))}
                 </div>
               </div>
+
+              <GeneratedDocumentsPanel
+                documents={trackedComplaint.documents || []}
+                title="Download Documents"
+              />
             </div>
           )}
         </div>

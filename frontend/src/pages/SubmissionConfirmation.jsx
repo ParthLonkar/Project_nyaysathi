@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { CheckCircle } from 'lucide-react';
+import GeneratedDocumentsPanel from '../components/GeneratedDocumentsPanel';
 
 function formatDate(value) {
   if (!value) return 'Not available';
@@ -24,6 +25,27 @@ export default function SubmissionConfirmation() {
 
   const complaintId = complaintData?.complaintId || null;
   const ai = complaintData?.aiResult || {};
+  const responseDocuments = complaintData?.documents || complaintData?.rawComplaint?.documents || [];
+  const inlinePdfDocuments = [
+    ai?.complaint_pdf
+      ? {
+        document_type: 'complaint_pdf',
+        file_name: `Complaint_Letter_${complaintId || 'draft'}.pdf`,
+        download_url: `data:application/pdf;base64,${ai.complaint_pdf}`,
+      }
+      : null,
+    ai?.rti_pdf
+      ? {
+        document_type: 'rti_pdf',
+        file_name: `RTI_Draft_${complaintId || 'draft'}.pdf`,
+        download_url: `data:application/pdf;base64,${ai.rti_pdf}`,
+      }
+      : null,
+  ].filter(Boolean);
+  const documents = responseDocuments.length > 0 ? responseDocuments : inlinePdfDocuments;
+
+  const complaintDraftText = ai?.complaint_draft || '';
+  const rtiDraftText = ai?.rti_draft || '';
 
   const liveInsights = useMemo(() => {
     return {
@@ -104,6 +126,20 @@ export default function SubmissionConfirmation() {
                 <p><span className="font-bold text-gray-700">Legal Strategy:</span> {liveInsights.strategy}</p>
                 <p><span className="font-bold text-gray-700">Summary:</span> {liveInsights.summary}</p>
               </div>
+            </div>
+          </div>
+
+          <div className="mb-10">
+            <GeneratedDocumentsPanel
+              documents={documents}
+              complaintDraftText={complaintDraftText}
+              rtiDraftText={rtiDraftText}
+              title="Generated Documents"
+            />
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 mt-4">
+              <p className="text-blue-900 font-semibold text-sm">
+                Citizen Update: {ai?.citizen_update || 'Your complaint was routed to the concerned department.'}
+              </p>
             </div>
           </div>
 

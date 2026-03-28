@@ -46,6 +46,15 @@ function extractAgentDetails(complaint) {
   };
 }
 
+function groupDocumentsByComplaint(documents = []) {
+  return documents.reduce((acc, doc) => {
+    if (!doc?.complaint_id) return acc;
+    if (!acc[doc.complaint_id]) acc[doc.complaint_id] = [];
+    acc[doc.complaint_id].push(doc);
+    return acc;
+  }, {});
+}
+
 function buildDefaultAnalytics(complaints = []) {
   const total = complaints.length;
   const pending = complaints.filter((c) => ['new', 'routed', 'received', 'assigned'].includes(c.status)).length;
@@ -104,9 +113,26 @@ export const adminService = {
         return { success: false, error: 'Failed to fetch complaints' };
       }
 
+      const complaintIds = (data || []).map((row) => row.id).filter(Boolean);
+      let documentsByComplaint = {};
+
+      if (complaintIds.length > 0) {
+        const { data: documentRows, error: documentsError } = await supabase
+          .from('complaint_documents')
+          .select('id, complaint_id, document_type, file_name, storage_path, public_url, created_at')
+          .in('complaint_id', complaintIds);
+
+        if (documentsError) {
+          logger.warn('Get complaint documents warning:', documentsError.message);
+        } else {
+          documentsByComplaint = groupDocumentsByComplaint(documentRows || []);
+        }
+      }
+
       const complaints = (data || []).map((complaint) => ({
         ...complaint,
         agent_details: extractAgentDetails(complaint),
+        documents: documentsByComplaint[complaint.id] || complaint?.ai_analysis?.documents || [],
       }));
 
       return { success: true, complaints };

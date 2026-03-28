@@ -61,6 +61,7 @@ export default function ComplaintForm() {
             attachments,
             aiResult: response?.aiResult || null,
             rawComplaint: response?.complaint || null,
+            documents: response?.documents || response?.complaint?.documents || [],
             citizen_update: response?.aiResult?.citizen_update || null,
           },
         },

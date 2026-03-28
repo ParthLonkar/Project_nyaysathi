@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { complaintService } from '../services/complaint.service';
+import GeneratedDocumentsPanel from '../components/GeneratedDocumentsPanel';
 
 export default function ComplaintDetails() {
   const { id } = useParams();
@@ -76,9 +77,30 @@ export default function ComplaintDetails() {
 
   const ai = complaint.ai_analysis || {};
   const displayCategory = ai.category || complaint.category || 'general';
-  const displayDepartment = ai.department || 'Municipal Grievance Cell';
+  const displayDepartment = ai.department || complaint.department || 'Municipal Grievance Cell';
   const displayPriority = ai.priority || complaint.priority || 'medium';
   const displaySummary = ai.summary || 'AI summary not available yet.';
+  const persistedDocuments = complaint.documents || ai.documents || [];
+  const inlinePdfDocuments = [
+    ai?.complaint_pdf
+      ? {
+        document_type: 'complaint_pdf',
+        file_name: `Complaint_Letter_${complaint.reference_id || complaint.id || 'draft'}.pdf`,
+        download_url: `data:application/pdf;base64,${ai.complaint_pdf}`,
+      }
+      : null,
+    ai?.rti_pdf
+      ? {
+        document_type: 'rti_pdf',
+        file_name: `RTI_Draft_${complaint.reference_id || complaint.id || 'draft'}.pdf`,
+        download_url: `data:application/pdf;base64,${ai.rti_pdf}`,
+      }
+      : null,
+  ].filter(Boolean);
+  const documents = persistedDocuments.length > 0 ? persistedDocuments : inlinePdfDocuments;
+  const complaintDraftText = ai.complaint_draft || '';
+  const rtiDraftText = ai.rti_draft || '';
+  const safeLastUpdated = complaint.submitted_at || complaint.created_at || null;
 
   return (
     <Layout>
@@ -117,7 +139,9 @@ export default function ComplaintDetails() {
             </div>
             <div className="card p-8">
               <p className="text-sm text-gray-600 font-bold uppercase tracking-widest mb-3">Last Updated</p>
-              <p className="text-sm font-bold text-gray-900">{new Date(complaint.updated_at).toLocaleDateString()}</p>
+              <p className="text-sm font-bold text-gray-900">
+                {safeLastUpdated ? new Date(safeLastUpdated).toLocaleDateString() : 'Not available'}
+              </p>
             </div>
           </div>
 
@@ -132,6 +156,15 @@ export default function ComplaintDetails() {
               <span className="text-3xl">📝</span> Description
             </h2>
             <p className="text-lg text-gray-700 leading-relaxed">{complaint.description}</p>
+          </div>
+
+          <div className="mb-12">
+            <GeneratedDocumentsPanel
+              documents={documents}
+              complaintDraftText={complaintDraftText}
+              rtiDraftText={rtiDraftText}
+              title="Generated Documents"
+            />
           </div>
 
           {/* AI Analysis */}
