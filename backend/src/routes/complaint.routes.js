@@ -5,7 +5,7 @@ import { authenticate } from '../middleware/auth.middleware.js';
 const router = express.Router();
 
 router.post('/', complaintController.createComplaint);
-router.get('/my', authenticate, complaintController.getUserComplaints);
+router.get('/my', complaintController.getUserComplaints);
 router.get('/', authenticate, complaintController.getAllComplaints);
 router.get('/:id', authenticate, complaintController.getComplaintById);
 router.patch('/:id/status', authenticate, complaintController.updateComplaintStatus);

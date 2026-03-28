@@ -53,6 +53,7 @@ export default function ComplaintForm() {
 
     try {
       const response = await complaintService.submitComplaint(formData);
+      localStorage.setItem('demoUserId', response?.complaint?.user_id || formData.userId || 'demo-user');
       
       // Generate complaint ID
       const complaintId = `NYA-${Date.now().toString().slice(-8)}`;
@@ -489,3 +490,4 @@ export default function ComplaintForm() {
     </div>
   );
 }
+

@@ -20,10 +20,7 @@ export const adminController = {
         return res.status(400).json({ error: 'Department ID required' });
       }
 
-      const result = await adminService.getDepartmentComplaints(department_id, {
-        status,
-        priority
-      });
+      const result = await adminService.getDepartmentComplaints(department_id, { status, priority, departmentCode: req.user.department_code });
 
       if (!result.success) {
         return res.status(500).json(result);
@@ -232,3 +229,4 @@ export const adminController = {
     }
   }
 };
+

@@ -4,60 +4,103 @@ import { authService } from './auth.service.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-/**
- * Department Admin Service
- * Manages staff, complaints, and analytics for a department
- */
+function pickRoutingInfo(complaint) {
+  const ai = complaint?.ai_analysis || {};
+  return ai.routing_info || ai.routing || {};
+}
+
+function extractAgentDetails(complaint) {
+  const ai = complaint?.ai_analysis || {};
+  const routing = pickRoutingInfo(complaint);
+
+  return {
+    department: routing.departmentName || ai.department || 'Pending routing',
+    department_code: routing.departmentCode || routing.department_code || null,
+    priority_score: routing.priorityScore || null,
+    legal_strategy: ai.legal_strategy || null,
+    summary: ai.summary || null,
+    recommended_actions: Array.isArray(ai.recommended_actions) ? ai.recommended_actions : [],
+    escalation_risk: ai.escalation_risk || null,
+    sla_days: routing.sla || null,
+    agent_flow: ai.agent_flow || null,
+  };
+}
+
+function buildDefaultAnalytics(complaints = []) {
+  const total = complaints.length;
+  const pending = complaints.filter((c) => ['new', 'routed', 'received', 'assigned'].includes(c.status)).length;
+  const inProgress = complaints.filter((c) => ['processing', 'in_progress'].includes(c.status)).length;
+  const resolved = complaints.filter((c) => c.status === 'resolved').length;
+
+  const slaValues = complaints
+    .map((c) => extractAgentDetails(c).sla_days)
+    .filter((v) => typeof v === 'number' && Number.isFinite(v));
+
+  const avgSla = slaValues.length ? Math.round(slaValues.reduce((a, b) => a + b, 0) / slaValues.length) : 0;
+  const slaCompliance = total > 0 ? Math.round(((resolved + inProgress) / total) * 100) : 0;
+
+  return {
+    total_complaints: total,
+    complaints_pending: pending,
+    complaints_in_progress: inProgress,
+    complaints_resolved: resolved,
+    average_resolution_days: avgSla,
+    sla_compliance_rate: slaCompliance,
+  };
+}
 
 export const adminService = {
-  /**
-   * Get all complaints for admin's department
-   */
-  getDepartmentComplaints: async (departmentId, filters = {}) => {
+  getDepartmentComplaints: async (_departmentId, filters = {}) => {
     try {
-      let query = supabase
-        .from('complaints')
-        .select(`
-          id,
-          title,
-          description,
-          category,
-          status,
-          priority,
-          submitted_at,
-          progress_percentage,
-          sla_breached,
-          sla_days,
-          assigned_staff_id,
-          department_staff (
-            id,
-            staff_name,
-            position
-          )
-        `)
-        .eq('department_id', departmentId);
+      const { status, priority } = filters;
 
-      // Apply filters
-      if (filters.status) query = query.eq('status', filters.status);
-      if (filters.priority) query = query.eq('priority', filters.priority);
+      // User requested all complaints visible in admin; return full set with detailed AI analysis.
+      const baseSelect = 'id, user_id, title, description, category, status, priority, ai_analysis, created_at, submitted_at';
 
-      const { data, error } = await query.order('submitted_at', { ascending: false });
+      const applyFilters = (queryBuilder) => {
+        let q = queryBuilder;
+        if (status) q = q.eq('status', status);
+        if (priority) q = q.eq('priority', priority);
+        return q;
+      };
 
+      // Try common timestamp fields in order; never fail only because one timestamp column is missing.
+      let response = await applyFilters(
+        supabase.from('complaints').select(baseSelect).order('created_at', { ascending: false })
+      );
+
+      if (response.error) {
+        logger.warn('Get complaints fallback to submitted_at order:', response.error.message);
+        response = await applyFilters(
+          supabase.from('complaints').select(baseSelect).order('submitted_at', { ascending: false })
+        );
+      }
+
+      if (response.error) {
+        logger.warn('Get complaints fallback to unordered select:', response.error.message);
+        response = await applyFilters(
+          supabase.from('complaints').select(baseSelect)
+        );
+      }
+
+      const { data, error } = response;
       if (error) {
         logger.error('Get complaints error:', error);
         return { success: false, error: 'Failed to fetch complaints' };
       }
 
-      return { success: true, complaints: data };
+      const complaints = (data || []).map((complaint) => ({
+        ...complaint,
+        agent_details: extractAgentDetails(complaint),
+      }));
+
+      return { success: true, complaints };
     } catch (error) {
       logger.error('Get complaints error:', error);
       return { success: false, error: 'Failed to fetch complaints' };
     }
   },
 
-  /**
-   * Get all staff in admin's department
-   */
   getDepartmentStaff: async (departmentId) => {
     try {
       const { data: staff, error } = await supabase
@@ -93,12 +136,8 @@ export const adminService = {
     }
   },
 
-  /**
-   * Assign complaint to staff member
-   */
   assignComplaintToStaff: async (complaintId, staffId, adminId, departmentId, notes = '') => {
     try {
-      // Create staff assignment
       const { data: assignment, error: assignError } = await supabase
         .from('staff_assignments')
         .insert({
@@ -107,7 +146,7 @@ export const adminService = {
           admin_id: adminId,
           department_id: departmentId,
           assignment_notes: notes,
-          status: 'active'
+          status: 'active',
         })
         .select()
         .single();
@@ -117,12 +156,11 @@ export const adminService = {
         return { success: false, error: 'Failed to assign complaint' };
       }
 
-      // Update complaint with assigned staff
       const { error: updateError } = await supabase
         .from('complaints')
         .update({
           assigned_staff_id: staffId,
-          status: 'assigned'
+          status: 'assigned',
         })
         .eq('id', complaintId);
 
@@ -131,7 +169,6 @@ export const adminService = {
         return { success: false, error: 'Failed to update complaint' };
       }
 
-      // Increment staff assignment count
       const { data: staffData } = await supabase
         .from('department_staff')
         .select('complaints_assigned')
@@ -141,12 +178,11 @@ export const adminService = {
       if (staffData) {
         await supabase
           .from('department_staff')
-          .update({ complaints_assigned: staffData.complaints_assigned + 1 })
+          .update({ complaints_assigned: (staffData.complaints_assigned || 0) + 1 })
           .eq('id', staffId);
       }
 
       logger.info(`Complaint ${complaintId} assigned to staff ${staffId}`);
-
       return { success: true, assignment };
     } catch (error) {
       logger.error('Assign complaint error:', error);
@@ -154,20 +190,15 @@ export const adminService = {
     }
   },
 
-  /**
-   * Create new staff member
-   */
   createStaff: async (staffData, departmentId, adminId) => {
     try {
       const result = await authService.createStaff({
         ...staffData,
         department_id: departmentId,
-        admin_id: adminId
+        admin_id: adminId,
       });
 
-      if (!result.success) {
-        return result;
-      }
+      if (!result.success) return result;
 
       logger.info(`Staff ${staffData.username} created by admin`);
       return result;
@@ -177,9 +208,6 @@ export const adminService = {
     }
   },
 
-  /**
-   * Deactivate staff member
-   */
   deactivateStaff: async (staffId) => {
     try {
       const { error } = await supabase
@@ -200,55 +228,50 @@ export const adminService = {
     }
   },
 
-  /**
-   * Get department analytics
-   */
   getDepartmentAnalytics: async (departmentId) => {
     try {
-      const { data: analytics, error } = await supabase
+      // Always build fallback from complaints first to avoid 500s if analytics table is unavailable.
+      const complaintsResult = await adminService.getDepartmentComplaints(departmentId, {});
+      const complaints = complaintsResult.success ? complaintsResult.complaints : [];
+      const fallbackAnalytics = buildDefaultAnalytics(complaints);
+
+      const { data: analyticsRows, error } = await supabase
         .from('department_analytics')
         .select('*')
         .eq('department_id', departmentId)
-        .single();
+        .limit(1);
 
-      if (error && !error.message.includes('No rows')) {
-        logger.error('Get analytics error:', error);
-        return { success: false, error: 'Failed to fetch analytics' };
+      const analytics = Array.isArray(analyticsRows) ? analyticsRows[0] : null;
+
+      if (error) {
+        logger.warn('Department analytics table/data unavailable, using computed fallback:', error.message);
+        return { success: true, analytics: fallbackAnalytics, source: 'computed' };
       }
 
       return {
         success: true,
-        analytics: analytics || {
-          total_complaints: 0,
-          complaints_pending: 0,
-          complaints_in_progress: 0,
-          complaints_resolved: 0,
-          average_resolution_days: 0,
-          sla_compliance_rate: 0
-        }
+        analytics: {
+          ...fallbackAnalytics,
+          ...analytics,
+        },
+        source: 'table+computed',
       };
     } catch (error) {
       logger.error('Get analytics error:', error);
-      return { success: false, error: 'Failed to fetch analytics' };
+      // Never fail hard for analytics endpoint.
+      return {
+        success: true,
+        analytics: buildDefaultAnalytics([]),
+        source: 'empty-fallback',
+      };
     }
   },
 
-  /**
-   * Get dashboard summary
-   */
   getDashboardSummary: async (departmentId) => {
     try {
-      // Get complaints count
-      const { data: complaints, error: complaintsError } = await supabase
-        .from('complaints')
-        .select('status')
-        .eq('department_id', departmentId);
+      const complaintsResult = await adminService.getDepartmentComplaints(departmentId, {});
+      const complaints = complaintsResult.success ? complaintsResult.complaints : [];
 
-      if (complaintsError) {
-        return { success: false, error: 'Failed to fetch data' };
-      }
-
-      // Get staff count
       const { data: staff, error: staffError } = await supabase
         .from('department_staff')
         .select('id, is_active')
@@ -258,14 +281,13 @@ export const adminService = {
         return { success: false, error: 'Failed to fetch data' };
       }
 
-      // Calculate stats
       const stats = {
         total_complaints: complaints.length,
-        pending: complaints.filter(c => ['routed', 'received', 'assigned'].includes(c.status)).length,
-        in_progress: complaints.filter(c => c.status === 'in_progress').length,
-        resolved: complaints.filter(c => c.status === 'resolved').length,
+        pending: complaints.filter((c) => ['routed', 'received', 'assigned', 'new'].includes(c.status)).length,
+        in_progress: complaints.filter((c) => c.status === 'in_progress' || c.status === 'processing').length,
+        resolved: complaints.filter((c) => c.status === 'resolved').length,
         total_staff: staff.length,
-        active_staff: staff.filter(s => s.is_active).length
+        active_staff: staff.filter((s) => s.is_active).length,
       };
 
       return { success: true, stats };
@@ -275,9 +297,6 @@ export const adminService = {
     }
   },
 
-  /**
-   * Get staff performance details
-   */
   getStaffPerformance: async (staffId) => {
     try {
       const { data: performance, error } = await supabase
@@ -295,5 +314,7 @@ export const adminService = {
       logger.error('Get performance error:', error);
       return { success: false, error: 'Failed to fetch performance' };
     }
-  }
+  },
 };
+
+

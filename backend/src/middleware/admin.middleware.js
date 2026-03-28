@@ -9,7 +9,8 @@ export const verifyAdminRole = (req, res, next) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (req.user.role !== 'department_admin') {
+    const role = req.user.role || req.user.type;
+    if (role !== 'department_admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 

@@ -6,7 +6,9 @@ export const complaintService = {
       title: formData.title,
       description: formData.description,
       location: formData.location,
-      userId: formData.userId || 'demo-user',
+      category: formData.category || 'general',
+      respondentName: formData.respondentName || '',
+      userId: formData.userId || localStorage.getItem('demoUserId') || 'demo-user',
     };
 
     const response = await api.post('/complaints', payload);
@@ -14,7 +16,8 @@ export const complaintService = {
   },
 
   getMyComplaints: async () => {
-    const response = await api.get('/complaints/my');
+    const userId = localStorage.getItem('demoUserId') || 'demo-user';
+    const response = await api.get('/complaints/my', { params: { userId } });
     return response.data;
   },
 
@@ -33,3 +36,4 @@ export const complaintService = {
     return response.data;
   },
 };
+
