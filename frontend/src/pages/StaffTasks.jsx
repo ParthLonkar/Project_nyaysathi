@@ -64,11 +64,19 @@ export default function StaffTasks() {
   const staffRole = staff?.position || 'Senior Clerk';
 
   const assignments = useMemo(() => {
-    return (complaints || [])
+    const mapped = (complaints || [])
       .filter(Boolean)
       .map((item) => {
         const complaint = item?.complaints || item || {};
         const complaintId = item?.complaint_id || complaint.id;
+        console.log('Item structure:', {
+          'item.id': item.id,
+          'item.complaint_id': item?.complaint_id,
+          'item.complaints': !!item?.complaints,
+          'complaint.id': complaint.id,
+          'final_complaintId': complaintId,
+          'complaints keys': Object.keys(complaint)
+        });
         return {
           id: item.id,
           complaint_id: complaintId,
@@ -80,6 +88,7 @@ export default function StaffTasks() {
           updated_at: complaint.updated_at || complaint.created_at || complaint.submitted_at
         };
       });
+    return mapped;
   }, [complaints]);
 
   const filteredAssignments = assignments.filter((row) => {

@@ -1,9 +1,67 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { API_BASE_URL } from '../utils/api.js';
 
 export default function StaffCaseDetails() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [complaint, setComplaint] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!id) return;
+    console.log('StaffCaseDetails ID from params:', id, 'Length:', id?.length);
+    fetchComplaintDetails();
+  }, [id]);
+
+  const fetchComplaintDetails = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('staffToken');
+
+      const response = await fetch(`${API_BASE_URL}/staff/complaints/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const { complaint: data } = await response.json();
+        setComplaint(data);
+      } else {
+        setError('Failed to load complaint details');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <div className="text-slate-500">Loading complaint details...</div>
+      </div>
+    );
+  }
+
+  if (error || !complaint) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <div className="text-red-500">{error || 'Complaint not found'}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface text-on-surface">
@@ -80,7 +138,9 @@ export default function StaffCaseDetails() {
             </button>
             <div className="h-4 w-[1px] bg-slate-200 mx-2"></div>
             <h2 className="font-headline font-bold text-xl text-primary uppercase tracking-tight">Case Details</h2>
-            <span className="text-sm bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-mono font-bold ml-2">#{id || 'NY-2024-8842'}</span>
+            <span className="text-sm bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full font-mono font-bold ml-2">
+              {complaint?.reference_id || `#${id?.slice(0, 8)}`}
+            </span>
           </div>
           <div className="flex items-center gap-6">
             <div className="relative flex items-center">
@@ -108,15 +168,34 @@ export default function StaffCaseDetails() {
           <div className="col-span-12 lg:col-span-8 flex flex-col gap-10">
             <section className="bg-surface-container-lowest rounded-xl p-8 shadow-sm">
               <div className="flex justify-between items-start mb-6">
-                <h3 className="font-headline font-bold text-2xl text-primary">Complaint Description</h3>
-                <span className="bg-primary-fixed text-on-primary-fixed px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">High Priority</span>
+                <div className="flex-1">
+                  <h3 className="font-headline font-bold text-2xl text-primary">{complaint?.title || 'Complaint Description'}</h3>
+                  <p className="text-sm text-slate-500 mt-2">Reference ID: {complaint?.reference_id}</p>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                  complaint?.priority === 'high' ? 'bg-error text-white' :
+                  complaint?.priority === 'medium' ? 'bg-amber-400 text-amber-900' :
+                  'bg-emerald-100 text-emerald-900'
+                }`}>
+                  {complaint?.priority || 'Medium'} Priority
+                </span>
               </div>
               <p className="text-on-surface/80 leading-relaxed text-lg mb-6">
-                The complainant alleges a serious breach of contract regarding the digital infrastructure rollout in the northern sector. The project, initiated under Agreement #AD-992, has faced consistent delays and non-compliance with technical specifications outlined in Annexure IV. Primary concerns include the failure to meet load-bearing benchmarks and recurring system outages during peak hours.
+                {complaint?.description || 'No description available'}
               </p>
-              <div className="bg-surface-container-low rounded-lg p-6 border-l-4 border-primary-fixed">
-                <p className="text-sm font-medium text-primary mb-1">Impact Analysis</p>
-                <p className="text-sm text-on-surface-variant">Estimated operational downtime: 142 hours. Financial variance: 18% above approved budget. Stakeholder sentiment remains critical.</p>
+              <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-slate-200">
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Category</p>
+                  <p className="text-sm font-medium text-slate-900 mt-1">{complaint?.category || 'General'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Status</p>
+                  <p className="text-sm font-medium text-slate-900 mt-1 capitalize">{complaint?.status?.replace(/_/g, ' ') || 'New'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Submitted</p>
+                  <p className="text-sm font-medium text-slate-900 mt-1">{formatDate(complaint?.submitted_at)}</p>
+                </div>
               </div>
             </section>
 
@@ -132,7 +211,7 @@ export default function StaffCaseDetails() {
                   </div>
                   <div className="flex-grow">
                     <p className="text-sm font-bold text-primary">Initial_Contract_AD992.pdf</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 12, 2024 • 2.4 MB</p>
+                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 12, 2024 ï¿½ 2.4 MB</p>
                   </div>
                   <button className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-100 rounded-lg text-slate-500">
                     <span className="material-symbols-outlined text-sm">download</span>
@@ -144,7 +223,7 @@ export default function StaffCaseDetails() {
                   </div>
                   <div className="flex-grow">
                     <p className="text-sm font-bold text-primary">Site_Survey_Photo_01.jpg</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 12, 2024 • 4.1 MB</p>
+                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 12, 2024 ï¿½ 4.1 MB</p>
                   </div>
                   <button className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-100 rounded-lg text-slate-500">
                     <span className="material-symbols-outlined text-sm">download</span>
@@ -156,7 +235,7 @@ export default function StaffCaseDetails() {
                   </div>
                   <div className="flex-grow">
                     <p className="text-sm font-bold text-primary">Technical_Specs_Annexure_IV.docx</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 15, 2024 • 840 KB</p>
+                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 15, 2024 ï¿½ 840 KB</p>
                   </div>
                   <button className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-100 rounded-lg text-slate-500">
                     <span className="material-symbols-outlined text-sm">download</span>
@@ -211,68 +290,60 @@ export default function StaffCaseDetails() {
               <h3 className="font-headline font-bold text-lg text-primary mb-6">Administrative Actions</h3>
               <div className="space-y-6">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Update Case Status</label>
-                  <div className="relative">
-                    <select className="w-full bg-white border-none rounded-xl py-3 pl-4 pr-10 text-sm font-medium focus:ring-2 focus:ring-primary/20 appearance-none shadow-sm cursor-pointer">
-                      <option>In Progress</option>
-                      <option>Under Review</option>
-                      <option>Awaiting Complainant</option>
-                      <option>Resolved</option>
-                      <option>Dismissed</option>
-                    </select>
-                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Current Status</label>
+                  <div className="w-full bg-white border-none rounded-xl py-3 px-4 text-sm font-medium shadow-sm capitalize">
+                    {complaint?.status?.replace(/_/g, ' ') || 'New'}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Internal Remarks</label>
-                  <textarea className="w-full bg-white border-none rounded-xl p-4 text-sm focus:ring-2 focus:ring-primary/20 shadow-sm resize-none placeholder:text-slate-300" placeholder="Add confidential notes for the legal team..." rows="4"></textarea>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Progress</label>
+                  <div className="w-full">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-slate-600">{complaint?.progress_percentage || 0}%</span>
+                    </div>
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div 
+                        className="bg-emerald-500 h-2 rounded-full transition-all"
+                        style={{ width: `${complaint?.progress_percentage || 0}%` }}
+                      ></div>
+                    </div>
+                  </div>
                 </div>
-                <button className="w-full py-3.5 bg-gradient-to-br from-primary to-primary-container text-white rounded-xl font-bold text-sm shadow-xl shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group">
-                  <span>Update Case Record</span>
-                  <span className="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">arrow_forward</span>
-                </button>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">SLA Days Remaining</label>
+                  <div className="text-lg font-bold text-primary">
+                    {complaint?.sla_days || 30} days
+                  </div>
+                </div>
               </div>
             </section>
 
             <section className="bg-surface-container-lowest rounded-xl p-6 shadow-sm border-t-4 border-secondary-fixed">
-              <h3 className="font-headline font-bold text-lg text-primary mb-6">Complainant Info</h3>
-              <div className="flex items-center gap-4 mb-8">
-                <div className="h-14 w-14 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center text-primary">
-                  <span className="material-symbols-outlined">person</span>
-                </div>
-                <div>
-                  <p className="font-bold text-primary">Rakesh Verma</p>
-                  <p className="text-xs text-on-surface-variant">Director, Verity Infrastructure</p>
-                </div>
-              </div>
+              <h3 className="font-headline font-bold text-lg text-primary mb-6">Complaint Info</h3>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-secondary-fixed-dim">mail</span>
+                  <span className="material-symbols-outlined text-secondary-fixed-dim">bookmark</span>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Email Address</p>
-                    <p className="text-sm font-medium text-on-surface">rakesh.verma@verity-infra.com</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Category</p>
+                    <p className="text-sm font-medium text-on-surface capitalize">{complaint?.category || 'General'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-secondary-fixed-dim">call</span>
+                  <span className="material-symbols-outlined text-secondary-fixed-dim">schedule</span>
                   <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Phone Number</p>
-                    <p className="text-sm font-medium text-on-surface">+91 98221 00452</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Submitted</p>
+                    <p className="text-sm font-medium text-on-surface">{formatDate(complaint?.submitted_at)}</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <span className="material-symbols-outlined text-secondary-fixed-dim mt-1">location_on</span>
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Headquarters</p>
-                    <p className="text-sm font-medium text-on-surface leading-snug">Tech Park East, Block 4-C, New Delhi, India 110025</p>
+                {complaint?.location && (
+                  <div className="flex items-start gap-3">
+                    <span className="material-symbols-outlined text-secondary-fixed-dim mt-1">location_on</span>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Location</p>
+                      <p className="text-sm font-medium text-on-surface leading-snug">{complaint?.location}</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="mt-8 flex gap-2">
-                <button className="flex-grow py-2.5 bg-secondary-container text-on-secondary-container rounded-lg text-xs font-bold hover:bg-secondary-fixed transition-colors">Message User</button>
-                <button className="p-2.5 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors">
-                  <span className="material-symbols-outlined text-lg">more_horiz</span>
-                </button>
+                )}
               </div>
             </section>
 

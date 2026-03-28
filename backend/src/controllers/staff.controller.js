@@ -41,19 +41,31 @@ export const staffController = {
       const { id: staffId } = req.user;
       const { complaintId } = req.params;
 
+      logger.info(`Controller: getComplaintDetails - staffId=${staffId}, complaintId=${complaintId}`);
+
       if (!complaintId) {
         return res.status(400).json({ error: 'Complaint ID required' });
+      }
+
+      if (!staffId) {
+        logger.error('Staff ID not found in token');
+        return res.status(401).json({ error: 'Staff ID not found in token' });
       }
 
       const result = await staffService.getComplaintDetails(complaintId, staffId);
 
       if (!result.success) {
-        return res.status(400).json(result);
+        logger.error(`Service error: ${result.error}`);
+        return res.status(400).json({
+          success: false,
+          error: result.error,
+          details: 'Failed to fetch complaint details'
+        });
       }
 
       return res.json(result);
     } catch (error) {
-      logger.error('Get complaint details error:', error);
+      logger.error(`Controller exception: ${error.message}`);
       return res.status(500).json({ error: 'Failed to get complaint details' });
     }
   },

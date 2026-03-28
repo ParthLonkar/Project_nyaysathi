@@ -83,67 +83,77 @@ export const staffService = {
   getComplaintDetails: async (complaintId, staffId) => {
     try {
       const client = readClient();
-      const { data: complaint, error: complaintError } = await client
-        .from('complaints')
+      
+      logger.info(`getComplaintDetails called with: complaintId=${complaintId}, staffId=${staffId}, clientType=${supabaseAdmin ? 'admin' : 'anon'}`);
+      
+      // Fetch through staff_assignments to respect RLS policies
+      const { data: assignment, error: assignmentError } = await client
+        .from('staff_assignments')
         .select(`
-          *,
-          complaint_notes (
+          id,
+          complaint_id,
+          status,
+          assignment_notes,
+          assigned_at,
+          updated_at,
+          complaints (
             id,
-            note_text,
-            created_by_name,
-            created_at
-          ),
-          field_visits (
-            id,
-            visit_date,
-            visit_time,
-            location,
-            visit_type,
-            findings,
+            reference_id,
+            title,
+            description,
+            category,
+            priority,
             status,
+            progress_percentage,
+            sla_days,
+            submitted_at,
             created_at
           )
         `)
-        .eq('id', complaintId)
-        .single();
-
-      if (complaintError) {
-        return { success: false, error: 'Failed to fetch complaint' };
-      }
-
-      // Verify staff is assigned to this complaint
-      const { data: assignment } = await client
-        .from('staff_assignments')
-        .select('id')
-        .eq('complaint_id', complaintId)
         .eq('staff_id', staffId)
+        .eq('complaint_id', complaintId)
         .single();
 
-      if (!assignment) {
-        return { success: false, error: 'You are not assigned to this complaint' };
+      logger.info(`Query result: hasData=${!!assignment}, hasError=${!!assignmentError}, error=${assignmentError?.message}`);
+
+      if (assignmentError || !assignment) {
+        logger.error(`Staff assignment not found for staff_id=${staffId}, complaint_id=${complaintId}. Error: ${assignmentError?.message}, Code: ${assignmentError?.code}`);
+        return { success: false, error: 'Complaint not found or you are not assigned to it' };
       }
 
-      const { data: documents, error: documentError } = await supabase
-        .from('complaint_documents')
-        .select('id, complaint_id, document_type, file_name, storage_path, public_url, created_at')
+      // Extract complaint from the assignment
+      const complaint = assignment?.complaints;
+
+      if (!complaint) {
+        logger.error(`Complaint data missing from assignment`);
+        return { success: false, error: 'Complaint data not available' };
+      }
+
+      // Fetch related notes and visits if needed
+      const { data: notes } = await client
+        .from('complaint_notes')
+        .select('*')
         .eq('complaint_id', complaintId)
         .order('created_at', { ascending: false });
 
-      if (documentError) {
-        logger.warn(`Get complaint documents warning (${complaintId}):`, documentError.message);
-      }
+      const { data: visits } = await client
+        .from('field_visits')
+        .select('*')
+        .eq('complaint_id', complaintId)
+        .order('visit_date', { ascending: false });
 
-      return {
-        success: true,
+      logger.info(`Successfully fetched complaint details for complaint_id=${complaintId}`);
+
+      return { 
+        success: true, 
         complaint: {
           ...complaint,
-          documents: (documents && documents.length > 0)
-            ? documents
-            : (complaint?.ai_analysis?.documents || []),
-        },
+          complaint_notes: notes || [],
+          field_visits: visits || []
+        }
       };
     } catch (error) {
-      logger.error('Get complaint details error:', error);
+      logger.error(`Get complaint details exception: ${error.message}`);
       return { success: false, error: 'Failed to fetch complaint' };
     }
   },
