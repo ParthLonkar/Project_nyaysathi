@@ -21,7 +21,11 @@ class ProcessComplaintResponse(BaseModel):
     category: str
     department: str
     priority: str
+    legal_path: str
     legal_strategy: str
+    manual_review: bool
+    confidence_score: float
+    decision_rationale: str
     summary: str
     recommended_actions: list[str]
     admin_brief: str
@@ -88,10 +92,14 @@ async def process_complaint(payload: ProcessComplaintRequest):
       state.document_notes = state.document_notes or docs.get("document_notes", "")
 
     result = {
-        "category": state.category or enrichment.get("category", "general"),
+        "category": legal_analysis.get("category") or state.category or enrichment.get("category", "general"),
         "department": legal_analysis.get("department") or enrichment.get("department", "Municipal Grievance Cell"),
-        "priority": priority_label(float(state.priority_score or 0.0)),
+        "priority": legal_analysis.get("priority") or enrichment.get("priority") or priority_label(float(state.priority_score or 0.0)),
+        "legal_path": legal_analysis.get("legal_path") or enrichment.get("legal_path", "manual_review"),
         "legal_strategy": legal_analysis.get("filing_strategy") or enrichment.get("legal_strategy", ""),
+        "manual_review": bool(legal_analysis.get("manual_review", enrichment.get("manual_review", False))),
+        "confidence_score": float(legal_analysis.get("confidence_score", enrichment.get("confidence_score", 0.5))),
+        "decision_rationale": legal_analysis.get("decision_rationale") or enrichment.get("decision_rationale", ""),
         "summary": legal_analysis.get("issue_summary") or enrichment.get("summary", ""),
         "recommended_actions": state.recommended_actions or enrichment.get("recommended_actions", []),
         "admin_brief": enrichment.get("admin_brief", ""),
