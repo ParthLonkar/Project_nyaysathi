@@ -12,11 +12,11 @@ const buildResolvedTitle = (title, description) => {
   return 'Civic complaint';
 };
 
-const parseMetadataAttachments = (attachments) => {
-  if (Array.isArray(attachments)) return attachments;
-  if (typeof attachments === 'string') {
+const parseMetadataAttachments = (attachmentsMeta) => {
+  if (Array.isArray(attachmentsMeta)) return attachmentsMeta;
+  if (typeof attachmentsMeta === 'string') {
     try {
-      const parsed = JSON.parse(attachments);
+      const parsed = JSON.parse(attachmentsMeta);
       return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
       return [];
@@ -58,13 +58,32 @@ export const complaintController = {
         name,
         phone,
         attachments,
+        attachment_meta,
       } = req.body || {};
 
       const uploadedFiles = Array.isArray(req.files) ? req.files : [];
-      const metadataAttachments = parseMetadataAttachments(attachments);
+      const metadataAttachments = parseMetadataAttachments(attachment_meta || attachments);
       const resolvedDescription = description || complaint_text || '';
       const resolvedTitle = buildResolvedTitle(title, resolvedDescription);
       const resolvedUserId = req.user?.id || userId || 'demo-user';
+
+      logger.info(
+        'Complaint request received',
+        JSON.stringify({
+          hasText: Boolean(resolvedDescription),
+          location: location || null,
+          userId: resolvedUserId,
+          hasName: Boolean(name),
+          hasPhone: Boolean(phone),
+          metadataAttachmentCount: metadataAttachments.length,
+          uploadedFileCount: uploadedFiles.length,
+          uploadedFiles: uploadedFiles.map((file) => ({
+            name: file.originalname,
+            type: file.mimetype,
+            size: file.size,
+          })),
+        })
+      );
 
       const missingFields = [];
       if (!resolvedDescription) missingFields.push('complaint_text');
@@ -104,6 +123,7 @@ export const complaintController = {
 
         if (error) throw error;
         complaint = data;
+        logger.info(`Complaint base insert success: ${complaint.id}`);
       } catch (insertError) {
         logger.warn('Complaint insert with extended columns failed, retrying with minimal payload:', insertError.message);
         const minimalPayload = {
@@ -123,16 +143,34 @@ export const complaintController = {
 
         if (error) throw error;
         complaint = data;
+        logger.info(`Complaint base insert success (minimal payload): ${complaint.id}`);
       }
 
       let aiResult;
+      const aiStartMs = Date.now();
       try {
+        logger.info(`AI enrichment start for complaint ${complaint.id}`);
         aiResult = await pythonService.callAIService({
           text: resolvedDescription,
           location,
         });
+        logger.info(
+          `AI enrichment success for complaint ${complaint.id}`,
+          JSON.stringify({
+            durationMs: Date.now() - aiStartMs,
+            category: aiResult?.category,
+            department: aiResult?.department,
+            priority: aiResult?.priority,
+            hasComplaintDraft: Boolean(aiResult?.complaint_draft),
+            hasRtiDraft: Boolean(aiResult?.rti_draft),
+            documentValid: aiResult?.document_valid,
+          })
+        );
       } catch (aiError) {
-        logger.warn('AI enrichment unavailable, using fallback response', aiError.message);
+        logger.warn(
+          `AI enrichment failed for complaint ${complaint.id}, using fallback`,
+          JSON.stringify({ durationMs: Date.now() - aiStartMs, error: aiError.message })
+        );
         aiResult = pythonService.buildFallbackAIResult(resolvedDescription, location, aiError.message);
       }
 
@@ -152,6 +190,10 @@ export const complaintController = {
         complaint.id,
         uploadedFiles,
         metadataAttachments
+      );
+      logger.info(
+        `Attachment persistence complete for complaint ${complaint.id}`,
+        JSON.stringify({ requested: uploadedFiles.length, saved: savedAttachments.length })
       );
 
       const aiAuditPayload = {
@@ -213,9 +255,11 @@ export const complaintController = {
 
         if (!fallbackError && fallbackData) {
           updatedComplaint = fallbackData;
+          logger.info(`Complaint AI fallback update success: ${complaint.id}`);
         }
       } else {
         updatedComplaint = updateData;
+        logger.info(`Complaint AI mapped update success: ${complaint.id}`);
       }
 
       res.status(201).json({

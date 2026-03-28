@@ -2,10 +2,11 @@ import axios from 'axios';
 import { logger } from '../utils/logger.js';
 
 const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
+const AI_TIMEOUT_MS = Number(process.env.AI_SERVICE_TIMEOUT_MS || 45000);
 
 const pythonClient = axios.create({
   baseURL: PYTHON_SERVICE_URL,
-  timeout: 30000, // 30 seconds
+  timeout: AI_TIMEOUT_MS,
 });
 
 const buildEscalationReasoning = ({ category, priority, text }) => {
@@ -50,6 +51,10 @@ const normalizeAIResult = (aiData, sourceText = '', sourceLocation = '') => {
     citizen_update: aiData?.citizen_update || 'Your complaint is registered and under review.',
     escalation_risk: aiData?.escalation_risk || buildEscalationReasoning({ category, priority, text: sourceText }),
     manual_review: aiData?.manual_review === true,
+    complaint_draft: aiData?.complaint_draft || '',
+    rti_draft: aiData?.rti_draft || '',
+    document_valid: aiData?.document_valid === true,
+    document_notes: aiData?.document_notes || '',
   };
 };
 
@@ -70,6 +75,10 @@ const buildFallbackAIResult = (sourceText = '', sourceLocation = '', reason = ''
     citizen_update: 'Your complaint is submitted and queued for manual review.',
     escalation_risk: 'Escalate if no departmental action is recorded within SLA window.',
     manual_review: true,
+    complaint_draft: `Subject: Complaint regarding civic issue in ${sourceLocation || 'the reported area'}\n\nTo: Municipal Grievance Cell\n\nComplaint Details:\n${sourceText || 'Complaint details not available.'}\n\nRequested Action:\nPlease review and route this complaint manually.`,
+    rti_draft: 'To: Public Information Officer\n\nSubject: Request for information under RTI\n\nInformation requested:\nAction taken report and responsible officer details.\n\nApplicant details:\nNot provided',
+    document_valid: true,
+    document_notes: 'Fallback draft generated due to AI service failure.',
     fallback_reason: reason || 'AI service unavailable',
   }, sourceText, sourceLocation);
 };
@@ -80,13 +89,36 @@ export const pythonService = {
   buildFallbackAIResult,
 
   callAIService: async (data) => {
+    const requestStartedAt = Date.now();
     try {
-      const response = await axios.post(`${PYTHON_SERVICE_URL}/process-complaint`, data, {
-        timeout: 30000,
-      });
+      logger.info(
+        'AI request start',
+        JSON.stringify({
+          endpoint: `${PYTHON_SERVICE_URL}/process-complaint`,
+          timeoutMs: AI_TIMEOUT_MS,
+          hasText: Boolean(data?.text),
+          hasLocation: Boolean(data?.location),
+        })
+      );
+
+      const response = await pythonClient.post('/process-complaint', data);
+      logger.info(
+        'AI request success',
+        JSON.stringify({
+          durationMs: Date.now() - requestStartedAt,
+          status: response?.status,
+        })
+      );
       return normalizeAIResult(response.data, data?.text, data?.location);
     } catch (error) {
-      logger.error('AI service call failed:', error.message);
+      logger.error(
+        'AI request failed',
+        JSON.stringify({
+          durationMs: Date.now() - requestStartedAt,
+          status: error.response?.status || 502,
+          error: error.message,
+        })
+      );
 
       const message = error.response?.data?.detail
         || error.response?.data?.message

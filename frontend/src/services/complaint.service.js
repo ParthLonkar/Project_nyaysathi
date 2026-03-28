@@ -15,7 +15,7 @@ export const complaintService = {
       userId: formData.userId || 'demo-user',
       name: formData.name || formData.fullName || '',
       phone: formData.phone || '',
-      attachments: (formData.attachments || []).map((file) => ({
+      attachment_meta: (formData.attachments || []).map((file) => ({
         name: file.name,
         type: file.type,
         size: file.size,
@@ -32,7 +32,7 @@ export const complaintService = {
       multipart.append('userId', payload.userId);
       multipart.append('name', payload.name);
       multipart.append('phone', payload.phone);
-      multipart.append('attachments', JSON.stringify(payload.attachments));
+      multipart.append('attachment_meta', JSON.stringify(payload.attachment_meta));
 
       (formData.attachments || []).forEach((file) => {
         multipart.append('attachments', file);
