@@ -1,6 +1,10 @@
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
 
+const isPublicComplaintSubmission = (req) => {
+  return req.method === 'POST' && req.path === '/api/complaints';
+};
+
 /**
  * Verify JWT token middleware
  */
@@ -36,7 +40,11 @@ export const extractUser = (req, res, next) => {
     }
     next();
   } catch (error) {
-    logger.error('Extract user error:', error);
+    if (isPublicComplaintSubmission(req)) {
+      logger.warn('Extract user warning on public complaint submission:', error.message);
+    } else {
+      logger.debug('Extract user skipped due to invalid token:', error.message);
+    }
     next();
   }
 };

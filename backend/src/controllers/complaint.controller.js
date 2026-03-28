@@ -1,6 +1,6 @@
-import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
+import { pythonService } from '../services/python.service.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
@@ -9,7 +9,7 @@ export const complaintController = {
     try {
       console.log('Incoming complaint body:', req.body);
       const { title, description, location, userId } = req.body || {};
-      const resolvedUserId = userId || 'demo-user';
+      const resolvedUserId = req.user?.id || userId || 'demo-user';
 
       const missingFields = [];
       if (!title) missingFields.push('title');
@@ -29,30 +29,22 @@ export const complaintController = {
 
       let aiResult;
       try {
-        const aiResponse = await axios.post('http://localhost:8000/process-complaint', {
+        aiResult = await pythonService.callAIService({
           text: description,
           location,
-        }, {
-          timeout: 30000,
         });
-        aiResult = aiResponse.data;
       } catch (aiError) {
-        logger.error('Failed to process complaint with AI service:', aiError);
-        return res.status(502).json({
-          error: {
-            status: 502,
-            message: 'Failed to process complaint with AI service',
-          },
-        });
+        logger.warn('AI enrichment unavailable, using fallback response', aiError.message);
+        aiResult = pythonService.buildFallbackAIResult(description, location, aiError.message);
       }
 
       const complaintPayload = {
         user_id: resolvedUserId,
         title,
         description,
-        category: 'general',
+        category: aiResult.category || 'general',
         status: 'new',
-        priority: typeof aiResult?.priority === 'string' ? aiResult.priority : 'medium',
+        priority: aiResult.priority || 'medium',
         ai_analysis: {
           ...aiResult,
           input: {
