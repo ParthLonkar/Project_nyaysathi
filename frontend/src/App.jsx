@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import PortalSelection from './pages/PortalSelection';
 import SubmitComplaint from './pages/SubmitComplaint';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
@@ -22,12 +23,16 @@ function App() {
         <Routes>
           {/* Citizen Routes */}
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<PortalSelection />} />
+          <Route path="/portals" element={<PortalSelection />} />
           <Route path="/submit" element={<SubmitComplaint />} />
           <Route path="/submission-confirmation" element={<SubmissionConfirmation />} />
           <Route path="/track/:complaintId" element={<CaseTracking />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/complaint/:id" element={<ComplaintDetails />} />
+          
+          {/* Portal Selection */}
+          <Route path="/portals" element={<PortalSelection />} />
           
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLogin />} />

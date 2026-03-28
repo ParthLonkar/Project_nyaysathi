@@ -1,9 +1,163 @@
-import { createClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
 import { transitionState, checkSlaBreach, getStateProgress } from '../services/state-machine.service.js';
 import { shouldEscalate, determineEscalationLevel } from '../services/escalation.service.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabase = supabaseAdmin;
+
+const isMissingColumnError = (errorLike, columnName = '') => {
+  const message = errorLike?.message || String(errorLike || '');
+  if (!message) return false;
+  if (columnName) {
+    return message.toLowerCase().includes(`column complaints.${columnName}`.toLowerCase())
+      && message.toLowerCase().includes('does not exist');
+  }
+  return message.toLowerCase().includes('column complaints.') && message.toLowerCase().includes('does not exist');
+};
+
+const complaintSelectVariants = [
+  `
+    id,
+    title,
+    description,
+    category,
+    priority,
+    status,
+    progress_percentage,
+    sla_days,
+    submitted_at,
+    created_at,
+    sla_breached,
+    escalation_data,
+    updated_at,
+    assigned_officer_id,
+    routing_info,
+    ai_analysis,
+    location,
+    citizen_name,
+    citizen_phone
+  `,
+  `
+    id,
+    title,
+    description,
+    category,
+    priority,
+    status,
+    progress_percentage,
+    sla_days,
+    submitted_at,
+    created_at,
+    sla_breached,
+    escalation_data,
+    assigned_officer_id,
+    routing_info,
+    ai_analysis,
+    location,
+    citizen_name,
+    citizen_phone
+  `,
+  `
+    id,
+    title,
+    description,
+    category,
+    priority,
+    status,
+    progress_percentage,
+    sla_days,
+    submitted_at,
+    created_at,
+    sla_breached,
+    assigned_officer_id,
+    routing_info,
+    ai_analysis,
+    location,
+    citizen_name,
+    citizen_phone
+  `,
+  `
+    id,
+    title,
+    description,
+    category,
+    priority,
+    status,
+    progress_percentage,
+    sla_days,
+    submitted_at,
+    created_at,
+    sla_breached,
+    escalation_data,
+    updated_at,
+    routing_info,
+    ai_analysis,
+    location,
+    citizen_name,
+    citizen_phone
+  `,
+  `
+    id,
+    title,
+    description,
+    category,
+    priority,
+    status,
+    progress_percentage,
+    sla_days,
+    submitted_at,
+    created_at,
+    sla_breached,
+    escalation_data,
+    routing_info,
+    ai_analysis,
+    location,
+    citizen_name,
+    citizen_phone
+  `,
+  `
+    id,
+    title,
+    description,
+    category,
+    priority,
+    status,
+    progress_percentage,
+    sla_days,
+    submitted_at,
+    created_at,
+    sla_breached,
+    routing_info,
+    ai_analysis,
+    location,
+    citizen_name,
+    citizen_phone
+  `,
+];
+
+const fetchComplaintForTracking = async (id) => {
+  let lastError = null;
+
+  for (const selectClause of complaintSelectVariants) {
+    const response = await supabase
+      .from('complaints')
+      .select(selectClause)
+      .eq('id', id)
+      .single();
+
+    if (!response.error) {
+      return response;
+    }
+
+    lastError = response.error;
+
+    if (!isMissingColumnError(response.error)) {
+      return response;
+    }
+  }
+
+  return { data: null, error: lastError };
+};
 
 /**
  * Update complaint status and manage state transitions
@@ -26,7 +180,8 @@ export const updateComplaintStatus = async (req, res) => {
       .single();
 
     if (fetchError || !complaint) {
-      return res.status(404).json({ error: 'Complaint not found' });
+      if (fetchError) logger.warn('Status update complaint lookup failed:', fetchError.message);
+      return res.status(404).json({ error: 'Complaint not found for id: ' + id });
     }
 
     // Validate state transition using state machine service
@@ -55,20 +210,33 @@ export const updateComplaintStatus = async (req, res) => {
       };
     }
 
-    // Update complaint
-    const { data: updatedComplaint, error: updateError } = await supabase
+    const updatePayload = {
+      status,
+      progress_percentage: progress,
+      sla_breached: hasBreached,
+      escalation_data: escalationData,
+      updated_at: new Date().toISOString(),
+      ...(officer_id && { assigned_officer_id: officer_id }),
+    };
+
+    let updateResponse = await supabase
       .from('complaints')
-      .update({
-        status,
-        progress_percentage: progress,
-        sla_breached: hasBreached,
-        escalation_data: escalationData,
-        updated_at: new Date().toISOString(),
-        ...(officer_id && { assigned_officer_id: officer_id })
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();
+
+    if (updateResponse.error && isMissingColumnError(updateResponse.error, 'escalation_data')) {
+      const { escalation_data, ...fallbackPayload } = updatePayload;
+      updateResponse = await supabase
+        .from('complaints')
+        .update(fallbackPayload)
+        .eq('id', id)
+        .select()
+        .single();
+    }
+
+    const { data: updatedComplaint, error: updateError } = updateResponse;
 
     if (updateError) {
       logger.error('Error updating complaint status:', updateError);
@@ -90,9 +258,6 @@ export const updateComplaintStatus = async (req, res) => {
     if (historyError) {
       logger.warn('Could not create status history entry:', historyError);
     }
-
-    // Send notification to citizen
-    // TODO: Implement notification service
 
     logger.info(`Complaint ${id} status updated from ${complaint.status} to ${status}`);
 
@@ -120,35 +285,20 @@ export const getComplaintStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: complaint, error } = await supabase
-      .from('complaints')
-      .select(`
-        id,
-        status,
-        progress_percentage,
-        sla_days,
-        submitted_at,
-        sla_breached,
-        escalation_data,
-        updated_at,
-        assigned_officer_id,
-        routing_info
-      `)
-      .eq('id', id)
-      .single();
+    const complaintResponse = await fetchComplaintForTracking(id);
+    const { data: complaint, error } = complaintResponse;
 
     if (error || !complaint) {
-      return res.status(404).json({ error: 'Complaint not found' });
+      if (error) logger.warn('Tracking complaint lookup failed:', error.message);
+      return res.status(404).json({ error: 'Complaint not found for id: ' + id });
     }
 
-    // Get status history
     const { data: history } = await supabase
       .from('status_history')
       .select('*')
       .eq('complaint_id', id)
       .order('created_at', { ascending: false });
 
-    // Get officer details
     let officer = null;
     if (complaint.assigned_officer_id) {
       const { data: officerData } = await supabase
@@ -159,11 +309,15 @@ export const getComplaintStatus = async (req, res) => {
       officer = officerData;
     }
 
-    // Calculate SLA status
-    const daysPassed = Math.floor(
-      (new Date() - new Date(complaint.submitted_at)) / (1000 * 60 * 60 * 24)
-    );
-    const daysRemaining = complaint.sla_days - daysPassed;
+    const referenceDate = complaint.submitted_at || complaint.created_at || null;
+    const slaDays = Number.isFinite(Number(complaint.sla_days)) ? Number(complaint.sla_days) : 30;
+
+    let daysPassed = 0;
+    if (referenceDate) {
+      daysPassed = Math.max(0, Math.floor((new Date() - new Date(referenceDate)) / (1000 * 60 * 60 * 24)));
+    }
+
+    const daysRemaining = slaDays - daysPassed;
     let slaStatus = 'on_track';
     if (daysRemaining <= 5) slaStatus = 'at_risk';
     if (daysRemaining <= 0) slaStatus = 'breached';
@@ -171,19 +325,20 @@ export const getComplaintStatus = async (req, res) => {
     res.json({
       complaint: {
         ...complaint,
+        escalation_data: complaint.escalation_data || null,
+        updated_at: complaint.updated_at || complaint.submitted_at || complaint.created_at || null,
         daysPassed,
         daysRemaining,
-        slaStatus
+        slaStatus,
       },
-      statusHistory: history,
-      assignedOfficer: officer
+      statusHistory: history || [],
+      assignedOfficer: officer,
     });
   } catch (error) {
     logger.error('Get complaint status error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-
 /**
  * Get all complaints for a department
  * GET /api/complaints/department/:deptCode
@@ -352,3 +507,4 @@ export const getSLABreaches = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
