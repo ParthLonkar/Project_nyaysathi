@@ -3,10 +3,22 @@ import { logger } from '../utils/logger.js';
 import { authService } from './auth.service.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+function writeClient() {
+  return supabaseAdmin || supabase;
+}
+
+function isRlsError(errorLike) {
+  const message = errorLike?.message || String(errorLike || '');
+  return message.toLowerCase().includes('row-level security policy');
+}
 
 function pickRoutingInfo(complaint) {
   const ai = complaint?.ai_analysis || {};
-  return ai.routing_info || ai.routing || {};
+  return ai.routing_info || ai.routing || complaint?.routing_info || {};
 }
 
 function extractAgentDetails(complaint) {
@@ -14,13 +26,21 @@ function extractAgentDetails(complaint) {
   const routing = pickRoutingInfo(complaint);
 
   return {
-    department: routing.departmentName || ai.department || 'Pending routing',
+    department: routing.departmentName || ai.department || complaint?.department || 'Pending routing',
     department_code: routing.departmentCode || routing.department_code || null,
-    priority_score: routing.priorityScore || null,
+    priority_score: ai.priority_score || routing.priorityScore || null,
+    priority: ai.priority || routing.priority || complaint?.priority || 'medium',
     legal_strategy: ai.legal_strategy || null,
     summary: ai.summary || null,
     recommended_actions: Array.isArray(ai.recommended_actions) ? ai.recommended_actions : [],
     escalation_risk: ai.escalation_risk || null,
+    escalation_needed: ai.escalation_needed === true,
+    compliance_check: ai.compliance_check || null,
+    legal_analysis: ai.legal_analysis || null,
+    complaint_draft: ai.complaint_draft || null,
+    rti_draft: ai.rti_draft || null,
+    document_valid: ai.document_valid === true,
+    document_notes: ai.document_notes || null,
     sla_days: routing.sla || null,
     agent_flow: ai.agent_flow || null,
   };
@@ -53,9 +73,7 @@ export const adminService = {
   getDepartmentComplaints: async (_departmentId, filters = {}) => {
     try {
       const { status, priority } = filters;
-
-      // User requested all complaints visible in admin; return full set with detailed AI analysis.
-      const baseSelect = 'id, user_id, title, description, category, status, priority, ai_analysis, created_at, submitted_at';
+      const baseSelect = 'id, user_id, title, description, category, status, priority, ai_analysis, routing_info, created_at, submitted_at';
 
       const applyFilters = (queryBuilder) => {
         let q = queryBuilder;
@@ -64,7 +82,6 @@ export const adminService = {
         return q;
       };
 
-      // Try common timestamp fields in order; never fail only because one timestamp column is missing.
       let response = await applyFilters(
         supabase.from('complaints').select(baseSelect).order('created_at', { ascending: false })
       );
@@ -78,9 +95,7 @@ export const adminService = {
 
       if (response.error) {
         logger.warn('Get complaints fallback to unordered select:', response.error.message);
-        response = await applyFilters(
-          supabase.from('complaints').select(baseSelect)
-        );
+        response = await applyFilters(supabase.from('complaints').select(baseSelect));
       }
 
       const { data, error } = response;
@@ -138,7 +153,9 @@ export const adminService = {
 
   assignComplaintToStaff: async (complaintId, staffId, adminId, departmentId, notes = '') => {
     try {
-      const { data: assignment, error: assignError } = await supabase
+      const client = writeClient();
+
+      const { data: assignment, error: assignError } = await client
         .from('staff_assignments')
         .insert({
           complaint_id: complaintId,
@@ -153,10 +170,16 @@ export const adminService = {
 
       if (assignError) {
         logger.error('Assign complaint error:', assignError);
+        if (isRlsError(assignError)) {
+          return {
+            success: false,
+            error: 'Assignment blocked by Supabase RLS. Configure SUPABASE_SERVICE_ROLE_KEY in backend/.env or add INSERT policy for staff_assignments.',
+          };
+        }
         return { success: false, error: 'Failed to assign complaint' };
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await client
         .from('complaints')
         .update({
           assigned_staff_id: staffId,
@@ -176,7 +199,7 @@ export const adminService = {
         .single();
 
       if (staffData) {
-        await supabase
+        await client
           .from('department_staff')
           .update({ complaints_assigned: (staffData.complaints_assigned || 0) + 1 })
           .eq('id', staffId);
@@ -210,7 +233,7 @@ export const adminService = {
 
   deactivateStaff: async (staffId) => {
     try {
-      const { error } = await supabase
+      const { error } = await writeClient()
         .from('department_staff')
         .update({ is_active: false })
         .eq('id', staffId);
@@ -230,7 +253,6 @@ export const adminService = {
 
   getDepartmentAnalytics: async (departmentId) => {
     try {
-      // Always build fallback from complaints first to avoid 500s if analytics table is unavailable.
       const complaintsResult = await adminService.getDepartmentComplaints(departmentId, {});
       const complaints = complaintsResult.success ? complaintsResult.complaints : [];
       const fallbackAnalytics = buildDefaultAnalytics(complaints);
@@ -258,7 +280,6 @@ export const adminService = {
       };
     } catch (error) {
       logger.error('Get analytics error:', error);
-      // Never fail hard for analytics endpoint.
       return {
         success: true,
         analytics: buildDefaultAnalytics([]),
@@ -316,5 +337,3 @@ export const adminService = {
     }
   },
 };
-
-
