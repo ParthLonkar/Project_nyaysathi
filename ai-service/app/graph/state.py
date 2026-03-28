@@ -11,6 +11,11 @@ class ComplaintState(BaseModel):
     category: str
     legal_analysis: Optional[dict] = None
     draft_document: Optional[str] = None
+    complaint_draft: Optional[str] = None
+    rti_draft: Optional[str] = None
+    document_valid: Optional[bool] = None
+    document_notes: Optional[str] = None
+    improved_text: Optional[str] = None
     priority_score: Optional[float] = None
     compliance_check: Optional[dict] = None
     recommended_actions: Optional[list] = None

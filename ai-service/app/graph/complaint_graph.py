@@ -10,6 +10,27 @@ from app.agents import (
     action_agent,
 )
 from app.services.enrichment_service import build_ai_enrichment
+from app.services.document_service import build_document_intelligence
+
+
+async def document_intelligence_node(state: ComplaintState):
+    legal_analysis = state.legal_analysis or {}
+    department = legal_analysis.get("department")
+    location = legal_analysis.get("location") or "unknown"
+
+    document_result = build_document_intelligence(
+        text=state.description or "",
+        department=department,
+        location=location,
+        include_rti=True,
+    )
+
+    state.improved_text = document_result.get("improved_text")
+    state.complaint_draft = document_result.get("complaint_draft")
+    state.rti_draft = document_result.get("rti_draft")
+    state.document_valid = document_result.get("document_valid")
+    state.document_notes = document_result.get("document_notes")
+    return state
 
 
 def create_complaint_graph():
@@ -19,6 +40,7 @@ def create_complaint_graph():
     # Add nodes
     graph.add_node("intake", intake_agent.process_intake)
     graph.add_node("legal_analysis_node", legal_agent.perform_legal_analysis)
+    graph.add_node("document_intelligence_node", document_intelligence_node)
     graph.add_node("drafting", drafting_agent.draft_document)
     graph.add_node("compliance", compliance_agent.check_compliance)
     graph.add_node("priority", priority_agent.assess_priority)
@@ -26,7 +48,8 @@ def create_complaint_graph():
 
     # Add edges
     graph.add_edge("intake", "legal_analysis_node")
-    graph.add_edge("legal_analysis_node", "drafting")
+    graph.add_edge("legal_analysis_node", "document_intelligence_node")
+    graph.add_edge("document_intelligence_node", "drafting")
     graph.add_edge("drafting", "compliance")
     graph.add_edge("compliance", "priority")
     graph.add_edge("priority", "action")
@@ -52,6 +75,11 @@ def format_result(final_state: ComplaintState) -> dict:
         "status": "completed",
         "legal_analysis": final_state.legal_analysis,
         "draft_document": final_state.draft_document,
+        "complaint_draft": final_state.complaint_draft,
+        "rti_draft": final_state.rti_draft,
+        "document_valid": final_state.document_valid,
+        "document_notes": final_state.document_notes,
+        "improved_text": final_state.improved_text,
         "priority": final_state.priority_score,
         "compliance": final_state.compliance_check,
         "recommended_actions": final_state.recommended_actions,
