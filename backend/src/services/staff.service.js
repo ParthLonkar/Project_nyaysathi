@@ -2,6 +2,13 @@ import { createClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+function readClient() {
+  return supabaseAdmin || supabase;
+}
 
 /**
  * Department Staff Service
@@ -14,7 +21,8 @@ export const staffService = {
    */
   getAssignedComplaints: async (staffId, departmentId, filters = {}) => {
     try {
-      let query = supabase
+      const client = readClient();
+      let query = client
         .from('staff_assignments')
         .select(`
           id,
@@ -25,6 +33,7 @@ export const staffService = {
           updated_at,
           complaints (
             id,
+            reference_id,
             title,
             description,
             category,
@@ -32,10 +41,7 @@ export const staffService = {
             status,
             progress_percentage,
             sla_days,
-            submitted_at,
-            citizen_name,
-            citizen_phone,
-            citizen_email
+            submitted_at
           )
         `)
         .eq('staff_id', staffId)
@@ -67,7 +73,8 @@ export const staffService = {
    */
   getComplaintDetails: async (complaintId, staffId) => {
     try {
-      const { data: complaint, error: complaintError } = await supabase
+      const client = readClient();
+      const { data: complaint, error: complaintError } = await client
         .from('complaints')
         .select(`
           *,
@@ -96,7 +103,7 @@ export const staffService = {
       }
 
       // Verify staff is assigned to this complaint
-      const { data: assignment } = await supabase
+      const { data: assignment } = await client
         .from('staff_assignments')
         .select('id')
         .eq('complaint_id', complaintId)
@@ -264,7 +271,8 @@ export const staffService = {
    */
   getStaffDashboard: async (staffId) => {
     try {
-      const { data: assignments, error: assignmentError } = await supabase
+      const client = readClient();
+      const { data: assignments, error: assignmentError } = await client
         .from('staff_assignments')
         .select('complaint_id, complaints (status)')
         .eq('staff_id', staffId)
@@ -274,7 +282,7 @@ export const staffService = {
         return { success: false, error: 'Failed to fetch dashboard' };
       }
 
-      const { data: performance } = await supabase
+      const { data: performance } = await client
         .from('staff_performance')
         .select('*')
         .eq('staff_id', staffId)

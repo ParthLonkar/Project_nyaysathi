@@ -9,7 +9,8 @@ export const verifyStaffRole = (req, res, next) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    if (req.user.role !== 'department_staff') {
+    const type = req.user.type;
+    if (type !== 'department_staff') {
       return res.status(403).json({ error: 'Staff access required' });
     }
 

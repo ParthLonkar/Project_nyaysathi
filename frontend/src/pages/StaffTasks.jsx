@@ -68,8 +68,10 @@ export default function StaffTasks() {
       .filter(Boolean)
       .map((item) => {
         const complaint = item?.complaints || item || {};
+        const complaintId = item?.complaint_id || complaint.id;
         return {
-          id: complaint.id || item.id || crypto.randomUUID?.() || Math.random().toString(36).slice(2),
+          id: item.id,
+          complaint_id: complaintId,
           reference_id: complaint.reference_id || complaint.tracking_id || complaint.id || 'N/A',
           title: complaint.title || 'Untitled Complaint',
           category: complaint.category || 'General',
@@ -301,7 +303,10 @@ export default function StaffTasks() {
                             </span>
                           </td>
                           <td className="px-8 py-5 text-right">
-                            <button className="text-primary font-body text-xs font-bold hover:underline underline-offset-4 flex items-center justify-end gap-1">
+                            <button 
+                              onClick={() => navigate(`/staff/case/${row.complaint_id || row.id}`)}
+                              className="text-primary font-body text-xs font-bold hover:underline underline-offset-4 flex items-center justify-end gap-1"
+                            >
                               View Details
                               <span className="material-symbols-outlined text-sm">chevron_right</span>
                             </button>

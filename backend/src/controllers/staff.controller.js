@@ -16,7 +16,7 @@ export const staffController = {
       const { id: staffId } = req.user;
       const { priority, status } = req.query;
 
-      const result = await staffService.getAssignedComplaints(staffId, {
+      const result = await staffService.getAssignedComplaints(staffId, null, {
         priority,
         status
       });

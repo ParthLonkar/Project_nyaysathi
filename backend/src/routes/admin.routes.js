@@ -22,6 +22,9 @@ router.post('/assign-complaint', verifyToken, verifyAdminRole, adminController.a
 // Create new staff
 router.post('/staff', verifyToken, verifyAdminRole, adminController.createStaff);
 
+// Create new staff (alias endpoint)
+router.post('/add-staff', verifyToken, verifyAdminRole, adminController.createStaff);
+
 // Deactivate staff member
 router.put('/staff/:staffId/deactivate', verifyToken, verifyAdminRole, adminController.deactivateStaff);
 
