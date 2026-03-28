@@ -2,7 +2,18 @@ import { createClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
 import { authService } from './auth.service.js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseAdmin = supabaseServiceRoleKey
+  ? createClient(supabaseUrl, supabaseServiceRoleKey)
+  : null;
+
+function writeClient() {
+  return supabaseAdmin || supabase;
+}
 
 function pickRoutingInfo(complaint) {
   const ai = complaint?.ai_analysis || {};
@@ -53,8 +64,6 @@ export const adminService = {
   getDepartmentComplaints: async (_departmentId, filters = {}) => {
     try {
       const { status, priority } = filters;
-
-      // User requested all complaints visible in admin; return full set with detailed AI analysis.
       const baseSelect = 'id, user_id, title, description, category, status, priority, ai_analysis, created_at, submitted_at';
 
       const applyFilters = (queryBuilder) => {
@@ -64,7 +73,6 @@ export const adminService = {
         return q;
       };
 
-      // Try common timestamp fields in order; never fail only because one timestamp column is missing.
       let response = await applyFilters(
         supabase.from('complaints').select(baseSelect).order('created_at', { ascending: false })
       );
@@ -78,9 +86,7 @@ export const adminService = {
 
       if (response.error) {
         logger.warn('Get complaints fallback to unordered select:', response.error.message);
-        response = await applyFilters(
-          supabase.from('complaints').select(baseSelect)
-        );
+        response = await applyFilters(supabase.from('complaints').select(baseSelect));
       }
 
       const { data, error } = response;
@@ -138,7 +144,13 @@ export const adminService = {
 
   assignComplaintToStaff: async (complaintId, staffId, adminId, departmentId, notes = '') => {
     try {
-      const { data: assignment, error: assignError } = await supabase
+      const db = writeClient();
+
+      if (!supabaseAdmin) {
+        logger.warn('SUPABASE_SERVICE_ROLE_KEY is not configured; assignment writes may fail under RLS.');
+      }
+
+      const { data: assignment, error: assignError } = await db
         .from('staff_assignments')
         .insert({
           complaint_id: complaintId,
@@ -152,11 +164,22 @@ export const adminService = {
         .single();
 
       if (assignError) {
+        const msg = String(assignError.message || '').toLowerCase();
+        const isRls = msg.includes('row-level security') || assignError.code === '42501';
         logger.error('Assign complaint error:', assignError);
+
+        if (isRls) {
+          return {
+            success: false,
+            error:
+              'Assignment blocked by Supabase RLS. Configure SUPABASE_SERVICE_ROLE_KEY in backend/.env or add INSERT policy for staff_assignments.',
+          };
+        }
+
         return { success: false, error: 'Failed to assign complaint' };
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await db
         .from('complaints')
         .update({
           assigned_staff_id: staffId,
@@ -169,14 +192,14 @@ export const adminService = {
         return { success: false, error: 'Failed to update complaint' };
       }
 
-      const { data: staffData } = await supabase
+      const { data: staffData } = await db
         .from('department_staff')
         .select('complaints_assigned')
         .eq('id', staffId)
         .single();
 
       if (staffData) {
-        await supabase
+        await db
           .from('department_staff')
           .update({ complaints_assigned: (staffData.complaints_assigned || 0) + 1 })
           .eq('id', staffId);
@@ -210,7 +233,7 @@ export const adminService = {
 
   deactivateStaff: async (staffId) => {
     try {
-      const { error } = await supabase
+      const { error } = await writeClient()
         .from('department_staff')
         .update({ is_active: false })
         .eq('id', staffId);
@@ -230,7 +253,6 @@ export const adminService = {
 
   getDepartmentAnalytics: async (departmentId) => {
     try {
-      // Always build fallback from complaints first to avoid 500s if analytics table is unavailable.
       const complaintsResult = await adminService.getDepartmentComplaints(departmentId, {});
       const complaints = complaintsResult.success ? complaintsResult.complaints : [];
       const fallbackAnalytics = buildDefaultAnalytics(complaints);
@@ -258,7 +280,6 @@ export const adminService = {
       };
     } catch (error) {
       logger.error('Get analytics error:', error);
-      // Never fail hard for analytics endpoint.
       return {
         success: true,
         analytics: buildDefaultAnalytics([]),
@@ -316,5 +337,3 @@ export const adminService = {
     }
   },
 };
-
-
