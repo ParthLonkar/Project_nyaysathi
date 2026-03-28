@@ -2,6 +2,7 @@ import { logger } from '../utils/logger.js';
 import { pythonService } from '../services/python.service.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { attachmentService } from '../services/attachment.service.js';
+import { routeComplaint, generateRoutingRecommendations } from '../services/routing.service.js';
 
 const buildResolvedTitle = (title, description) => {
   if (title && String(title).trim()) return String(title).trim();
@@ -24,15 +25,15 @@ const parseMetadataAttachments = (attachments) => {
   return [];
 };
 
-const mapTopLevelAiFields = (aiResult = {}, fallbackInput = {}) => {
+const mapTopLevelAiFields = (aiResult = {}, fallbackInput = {}, routingDecision = {}) => {
   const recommendedActions = Array.isArray(aiResult.recommended_actions)
     ? aiResult.recommended_actions
     : [];
 
   return {
-    category: aiResult.category || 'general',
-    department: aiResult.department || null,
-    priority: aiResult.priority || 'medium',
+    category: aiResult.category || routingDecision.category || 'general',
+    department: aiResult.department || routingDecision.departmentName || null,
+    priority: aiResult.priority || routingDecision.priority || 'medium',
     legal_strategy: aiResult.legal_strategy || null,
     summary: aiResult.summary || null,
     recommended_actions: recommendedActions,
@@ -80,7 +81,6 @@ export const complaintController = {
         });
       }
 
-      // 1) Create complaint first so we always get a case ID (even if AI or attachment flow fails)
       const baseComplaintPayload = {
         user_id: resolvedUserId,
         title: resolvedTitle,
@@ -105,7 +105,6 @@ export const complaintController = {
         if (error) throw error;
         complaint = data;
       } catch (insertError) {
-        // Backward-compat fallback if some new columns are not migrated yet
         logger.warn('Complaint insert with extended columns failed, retrying with minimal payload:', insertError.message);
         const minimalPayload = {
           user_id: resolvedUserId,
@@ -126,7 +125,6 @@ export const complaintController = {
         complaint = data;
       }
 
-      // 2) AI enrichment with fallback-safe behavior
       let aiResult;
       try {
         aiResult = await pythonService.callAIService({
@@ -138,19 +136,40 @@ export const complaintController = {
         aiResult = pythonService.buildFallbackAIResult(resolvedDescription, location, aiError.message);
       }
 
-      // 3) Upload attachments (if multipart files exist), then persist attachment rows
+      const routingDecision = routeComplaint({
+        category: aiResult?.category || 'general',
+        description: resolvedDescription,
+        title: resolvedTitle,
+        location,
+      });
+
+      const routingRecommendations = generateRoutingRecommendations({
+        category: aiResult?.category || routingDecision.category || 'general',
+        description: resolvedDescription,
+      });
+
       const savedAttachments = await attachmentService.persistAttachments(
         complaint.id,
         uploadedFiles,
         metadataAttachments
       );
 
-      // 4) Update complaint with mapped AI fields while keeping raw ai_analysis for audit/debug
       const aiAuditPayload = {
         ...aiResult,
+        routing_info: routingDecision,
+        routing_recommendations: routingRecommendations,
         attachments: savedAttachments,
         ai_analysis: {
           ...aiResult,
+          routing_info: routingDecision,
+          routing_recommendations: routingRecommendations,
+          agent_flow: {
+            intake: 'completed',
+            routing: 'completed',
+            drafting: aiResult?.drafting ? 'completed' : 'pending',
+            compliance: aiResult?.compliance ? 'completed' : 'pending',
+            action: 'completed',
+          },
           attachments: savedAttachments,
           input: {
             text: resolvedDescription,
@@ -162,9 +181,10 @@ export const complaintController = {
         },
       };
 
-      const mappedFields = mapTopLevelAiFields(aiResult, { name, phone, location });
+      const mappedFields = mapTopLevelAiFields(aiResult, { name, phone, location }, routingDecision);
       const updatePayload = {
         ...mappedFields,
+        routing_info: routingDecision,
         ai_analysis: aiAuditPayload.ai_analysis,
       };
 
@@ -179,8 +199,8 @@ export const complaintController = {
       if (updateError) {
         logger.warn(`Failed to update mapped AI fields on complaint ${complaint.id}:`, updateError.message);
         const fallbackUpdate = {
-          category: aiResult.category || 'general',
-          priority: aiResult.priority || 'medium',
+          category: aiResult.category || routingDecision.category || 'general',
+          priority: aiResult.priority || routingDecision.priority || 'medium',
           ai_analysis: aiAuditPayload.ai_analysis,
         };
 
@@ -201,7 +221,7 @@ export const complaintController = {
       res.status(201).json({
         success: true,
         caseId: complaint.id,
-        aiResult,
+        aiResult: { ...aiResult, routing_info: routingDecision, routing_recommendations: routingRecommendations },
         complaint: updatedComplaint,
         attachments: savedAttachments,
       });
@@ -235,13 +255,13 @@ export const complaintController = {
         query = query.eq('status', filter);
       }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (error) throw error;
-    res.json(data);
-  } catch (error) {
-    next(error);
-  }
-},
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+      res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  },
 
   getComplaintById: async (req, res, next) => {
     try {
@@ -297,3 +317,5 @@ export const complaintController = {
     }
   },
 };
+
+

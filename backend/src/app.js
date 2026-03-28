@@ -7,6 +7,7 @@ import aiRoutes from './routes/ai.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import staffRoutes from './routes/staff.routes.js';
+import statusRoutes from './routes/status.routes.js';
 import { extractUser } from './middleware/auth.middleware.js';
 
 const app = express();
@@ -34,6 +35,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/staff', staffRoutes);
+app.use('/api/status', statusRoutes);
 
 // Error handling
 app.use(notFound);
@@ -42,3 +44,4 @@ app.use(errorHandler);
 logger.info('Express app configured');
 
 export default app;
+

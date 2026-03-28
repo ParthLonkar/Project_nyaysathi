@@ -447,8 +447,8 @@ export default function Home() {
                 <input
                   type="text"
                   value={trackingId}
-                  onChange={(e) => setTrackingId(e.target.value.toUpperCase())}
-                  placeholder="Enter your Complaint ID (e.g., NYA-12345678)"
+                  onChange={(e) => setTrackingId(e.target.value.trim())}
+                  placeholder="Enter your Complaint Reference ID"
                   className="w-full pl-12 pr-4 py-4 rounded-xl border-2 border-gray-200 focus:border-blue-600 focus:outline-none text-lg font-mono transition-colors"
                 />
               </div>
@@ -716,3 +716,4 @@ export default function Home() {
     </Layout>
   );
 }
+
