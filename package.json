@@ -1,0 +1,24 @@
+{
+  "name": "nyaysathi-ai",
+  "version": "1.0.0",
+  "description": "AI-Powered Legal Justice Platform",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w frontend & npm run dev -w backend",
+    "build": "npm run build -w frontend && npm run build -w backend",
+    "test": "npm run test -w frontend && npm run test -w backend"
+  },
+  "keywords": [
+    "legal",
+    "ai",
+    "complaints",
+    "justice",
+    "langgraph"
+  ],
+  "author": "",
+  "license": "MIT"
+}
