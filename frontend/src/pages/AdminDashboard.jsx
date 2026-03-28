@@ -29,6 +29,7 @@ export default function AdminDashboard() {
     expertise_area: ''
   });
   const [expertiseAreas, setExpertiseAreas] = useState([]); // For tag management
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
   // Check authentication
   useEffect(() => {
@@ -45,6 +46,17 @@ export default function AdminDashboard() {
     if (!admin) return;
     fetchDashboardData();
   }, [admin]);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('[data-profile-menu]')) {
+        setShowProfileDropdown(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -301,16 +313,176 @@ export default function AdminDashboard() {
             <button className="text-slate-500 hover:bg-slate-50 p-2 rounded-lg transition-colors">
               <span className="material-symbols-outlined">settings</span>
             </button>
-            <div className="flex items-center space-x-3 border-l border-slate-200 pl-5">
-              <div className="text-right hidden sm:block">
+            <div className="flex items-center space-x-3 border-l border-slate-200 pl-5 relative" data-profile-menu>
+              <div 
+                className="text-right hidden sm:block cursor-pointer hover:opacity-75 transition-opacity"
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+              >
                 <p className="text-xs font-bold text-primary">{admin?.staff_name || 'Admin User'}</p>
                 <p className="text-[10px] text-slate-500 font-medium">{admin?.position || 'Administrator'}</p>
               </div>
               <img
                 alt="User avatar"
-                className="w-10 h-10 rounded-lg object-cover ring-2 ring-primary/10"
+                className="w-10 h-10 rounded-lg object-cover ring-2 ring-primary/10 cursor-pointer hover:ring-primary/30 transition-all"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5nCnkY_fb_U5cF73Rhv7NN7zcpJMgLcgSoUejKnr_ma9ZzqGdt_aRXAMJ9h5CZsfLlYPAC_jQ9hcy7kQlH4x20sRWMLf4LR4GCKsKoI8Si_JsbKRqZPhP4n8B_Lv2tFsB52B2cbwCrGwF91JieflE85gl0MWAWV00921cPZJ4KZPUmPMM2CdyPi4u0nWB4Jv_J80JeJnPxLCu6ldRnsWSeF_nu5SYtynDKOsMDnBXIvQlciiNqvcdlxFnGwr77zZn1KVMGlRkIE8A"
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
               />
+
+              {/* Profile Dropdown */}
+              {showProfileDropdown && (
+                <div className="absolute top-14 right-0 w-72 bg-white rounded-lg shadow-2xl border border-outline-variant z-50 overflow-hidden max-h-[90vh] overflow-y-auto">
+                  
+                  {/* Profile Header */}
+                  <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-4 border-b border-outline-variant">
+                    <div className="flex items-center space-x-3">
+                      <img
+                        alt="Profile"
+                        className="w-14 h-14 rounded-lg object-cover ring-2 ring-primary"
+                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5nCnkY_fb_U5cF73Rhv7NN7zcpJMgLcgSoUejKnr_ma9ZzqGdt_aRXAMJ9h5CZsfLlYPAC_jQ9hcy7kQlH4x20sRWMLf4LR4GCKsKoI8Si_JsbKRqZPhP4n8B_Lv2tFsB52B2cbwCrGwF91JieflE85gl0MWAWV00921cPZJ4KZPUmPMM2CdyPi4u0nWB4Jv_J80JeJnPxLCu6ldRnsWSeF_nu5SYtynDKOsMDnBXIvQlciiNqvcdlxFnGwr77zZn1KVMGlRkIE8A"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-headline text-xs font-bold text-on-surface truncate">{admin?.staff_name || 'Admin User'}</p>
+                        <p className="text-[9px] text-secondary mt-0.5">{admin?.position || 'Administrator'}</p>
+                        <div className="mt-1.5 inline-flex items-center space-x-1 bg-tertiary-container px-1.5 py-0.5 rounded-full">
+                          <span className="material-symbols-outlined text-[12px] text-tertiary">verified_user</span>
+                          <span className="text-[8px] font-semibold text-tertiary">Verified</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Profile Information Section */}
+                  <div className="p-4 border-b border-outline-variant space-y-2">
+                    <p className="text-[9px] uppercase tracking-[0.12em] font-bold text-primary/60 mb-2">Account Information</p>
+                    <div className="space-y-2">
+                      
+                      {/* Employee ID */}
+                      <div className="flex items-start space-x-2">
+                        <span className="material-symbols-outlined text-primary mt-0.5" style={{fontSize: '16px'}}>badge</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[8px] text-slate-500 font-medium">Employee ID</p>
+                          <p className="text-xs font-semibold text-on-surface truncate">{admin?.id ? String(admin.id).substring(0, 8).toUpperCase() : 'ADM-0001'}</p>
+                        </div>
+                      </div>
+
+                      {/* Department */}
+                      <div className="flex items-start space-x-2">
+                        <span className="material-symbols-outlined text-secondary mt-0.5" style={{fontSize: '16px'}}>domain</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[8px] text-slate-500 font-medium">Department</p>
+                          <p className="text-xs font-semibold text-on-surface truncate">{typeof admin?.department === 'string' ? admin.department : admin?.department?.name || 'Administration'}</p>
+                        </div>
+                      </div>
+
+                      {/* Contact Email */}
+                      <div className="flex items-start space-x-2">
+                        <span className="material-symbols-outlined text-tertiary mt-0.5" style={{fontSize: '16px'}}>mail</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[8px] text-slate-500 font-medium">Email</p>
+                          <p className="text-xs font-semibold text-on-surface truncate">{typeof admin?.email === 'string' ? admin.email : admin?.email?.email || 'admin@nyaysathi.gov.in'}</p>
+                        </div>
+                      </div>
+
+                      {/* Phone */}
+                      <div className="flex items-start space-x-2">
+                        <span className="material-symbols-outlined text-primary mt-0.5" style={{fontSize: '16px'}}>phone</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[8px] text-slate-500 font-medium">Office Phone</p>
+                          <p className="text-xs font-semibold text-on-surface truncate">{typeof admin?.phone === 'string' ? admin.phone : admin?.phone?.phone || '+91-11-XXXX-XXXX'}</p>
+                        </div>
+                      </div>
+
+                      {/* Last Login */}
+                      <div className="flex items-start space-x-2">
+                        <span className="material-symbols-outlined text-slate-400 mt-0.5" style={{fontSize: '16px'}}>schedule</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[8px] text-slate-500 font-medium">Last Login</p>
+                          <p className="text-xs font-semibold text-on-surface">Today at 09:45 AM</p>
+                        </div>
+                      </div>
+
+                      {/* Account Status */}
+                      <div className="flex items-start space-x-2">
+                        <span className="material-symbols-outlined text-green-600 mt-0.5" style={{fontSize: '16px'}}>check_circle</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[8px] text-slate-500 font-medium">Account Status</p>
+                          <p className="text-xs font-semibold text-green-700">Active & Verified</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Stats Section */}
+                  <div className="p-4 border-b border-outline-variant">
+                    <p className="text-[9px] uppercase tracking-[0.12em] font-bold text-primary/60 mb-2">Performance</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-primary-container/30 p-2 rounded-lg text-center">
+                        <p className="text-sm font-bold text-primary">{complaints?.length || 0}</p>
+                        <p className="text-[8px] text-slate-600 font-medium mt-0.5">Total Cases</p>
+                      </div>
+                      <div className="bg-secondary-container/30 p-2 rounded-lg text-center">
+                        <p className="text-sm font-bold text-secondary">{summary?.resolved_complaints || 0}</p>
+                        <p className="text-[8px] text-slate-600 font-medium mt-0.5">Resolved</p>
+                      </div>
+                      <div className="bg-tertiary-container/30 p-2 rounded-lg text-center">
+                        <p className="text-sm font-bold text-tertiary">{staff?.length || 0}</p>
+                        <p className="text-[8px] text-slate-600 font-medium mt-0.5">Team Size</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Items Section */}
+                  <div className="p-2 space-y-1">
+                    <button className="w-full flex items-center space-x-2 px-3 py-2 hover:bg-surface-container rounded-lg transition-colors text-left">
+                      <span className="material-symbols-outlined text-primary flex-shrink-0" style={{fontSize: '18px'}}>person</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-on-surface">View Full Profile</p>
+                        <p className="text-[8px] text-slate-500">Detailed information</p>
+                      </div>
+                    </button>
+
+                    <button className="w-full flex items-center space-x-2 px-3 py-2 hover:bg-surface-container rounded-lg transition-colors text-left">
+                      <span className="material-symbols-outlined text-secondary flex-shrink-0" style={{fontSize: '18px'}}>edit</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-on-surface">Edit Profile</p>
+                        <p className="text-[8px] text-slate-500">Update information</p>
+                      </div>
+                    </button>
+
+                    <button className="w-full flex items-center space-x-2 px-3 py-2 hover:bg-surface-container rounded-lg transition-colors text-left">
+                      <span className="material-symbols-outlined text-tertiary flex-shrink-0" style={{fontSize: '18px'}}>lock</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-on-surface">Change Password</p>
+                        <p className="text-[8px] text-slate-500">Update security</p>
+                      </div>
+                    </button>
+
+                    <button className="w-full flex items-center space-x-2 px-3 py-2 hover:bg-surface-container rounded-lg transition-colors text-left">
+                      <span className="material-symbols-outlined text-slate-400 flex-shrink-0" style={{fontSize: '18px'}}>download</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-on-surface">Download ID</p>
+                        <p className="text-[8px] text-slate-500">Admin credentials</p>
+                      </div>
+                    </button>
+
+                    <div className="border-t border-outline-variant my-1"></div>
+
+                    <button 
+                      onClick={() => {
+                        handleLogout();
+                        setShowProfileDropdown(false);
+                      }}
+                      className="w-full flex items-center space-x-2 px-3 py-2 hover:bg-error-container/20 rounded-lg transition-colors text-left"
+                    >
+                      <span className="material-symbols-outlined text-error flex-shrink-0" style={{fontSize: '18px'}}>logout</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-error">Sign Out</p>
+                        <p className="text-[8px] text-error/60">End session</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
