@@ -9,6 +9,7 @@ from app.agents import (
     priority_agent,
     action_agent,
 )
+from app.services.enrichment_service import build_ai_enrichment
 
 
 def create_complaint_graph():
@@ -38,6 +39,14 @@ def create_complaint_graph():
 
 def format_result(final_state: ComplaintState) -> dict:
     """Format the final state into a result"""
+    priority_label = "high" if (final_state.priority_score or 0) >= 0.8 else "medium"
+    enriched = build_ai_enrichment(
+        text=final_state.description,
+        location="unknown",
+        category_hint=final_state.category,
+        priority_hint=priority_label,
+    )
+
     return {
         "complaint_id": final_state.complaint_id,
         "status": "completed",
@@ -47,5 +56,6 @@ def format_result(final_state: ComplaintState) -> dict:
         "compliance": final_state.compliance_check,
         "recommended_actions": final_state.recommended_actions,
         "escalation_needed": final_state.escalation_needed,
+        "enrichment": enriched,
         "timestamp": datetime.now().isoformat(),
     }

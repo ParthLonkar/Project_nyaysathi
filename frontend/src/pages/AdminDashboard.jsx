@@ -259,6 +259,7 @@ export default function AdminDashboard() {
                             <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Category</th>
                             <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Priority</th>
                             <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Status</th>
+                            <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">AI Insights</th>
                             <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Assigned Staff</th>
                             <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Action</th>
                           </tr>
@@ -281,6 +282,14 @@ export default function AdminDashboard() {
                                 <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
                                   {complaint.status}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-700 max-w-sm">
+                                <p className="font-semibold text-gray-900 line-clamp-2">
+                                  {complaint.ai_analysis?.admin_brief || 'No admin brief yet'}
+                                </p>
+                                <p className="text-xs text-red-700 mt-1 line-clamp-2">
+                                  Risk: {complaint.ai_analysis?.escalation_risk || 'Not available'}
+                                </p>
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-600">
                                 {complaint.department_staff?.staff_name || 'Unassigned'}

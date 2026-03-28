@@ -1,90 +1,72 @@
-import { createClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger.js';
 import { pythonService } from '../services/python.service.js';
-import {
-  routeComplaint,
-  generateRoutingRecommendations,
-  checkEscalationNeed,
-} from '../services/routing.service.js';
+import { supabaseAdmin } from '../config/supabase.js';
+import { attachmentService } from '../services/attachment.service.js';
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-
-const CATEGORY_ALIAS = {
-  water: 'general',
-  sanitation: 'general',
-  other: 'general',
+const buildResolvedTitle = (title, description) => {
+  if (title && String(title).trim()) return String(title).trim();
+  if (description && String(description).trim()) {
+    return String(description).trim().split('.').shift().slice(0, 80);
+  }
+  return 'Civic complaint';
 };
 
-function normalizeCategory(input = '') {
-  const value = String(input || '').toLowerCase().trim();
-  if (!value) return 'general';
-  return CATEGORY_ALIAS[value] || value;
-}
+const parseMetadataAttachments = (attachments) => {
+  if (Array.isArray(attachments)) return attachments;
+  if (typeof attachments === 'string') {
+    try {
+      const parsed = JSON.parse(attachments);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+  return [];
+};
 
-function buildWorkflowOutput({ title, description, location, category, respondentName, aiResult }) {
-  const routing = routeComplaint({
-    title,
-    description,
-    location,
-    category,
-    respondentName,
-  });
-
-  const recommendations = generateRoutingRecommendations({
-    title,
-    description,
-    category,
-  });
-
-  const escalation = checkEscalationNeed({
-    respondentName,
-    description,
-    category,
-  });
+const mapTopLevelAiFields = (aiResult = {}, fallbackInput = {}) => {
+  const recommendedActions = Array.isArray(aiResult.recommended_actions)
+    ? aiResult.recommended_actions
+    : [];
 
   return {
-    category,
-    department: aiResult?.department || routing.departmentName,
-    priority: routing.priority,
-    summary: aiResult?.summary || `Complaint routed to ${routing.departmentName} for ${location || 'reported location'}.`,
-    legal_strategy: aiResult?.legal_strategy || 'File grievance and seek written response with SLA follow-up.',
-    recommended_actions: [...new Set([...(aiResult?.recommended_actions || []), ...recommendations])],
-    staff_action_note: aiResult?.staff_action_note || 'Validate facts, contact citizen if required, and set first action update.',
-    admin_brief: aiResult?.admin_brief || `Assign to ${routing.departmentName} and track SLA (${routing.sla} days).`,
-    citizen_update: aiResult?.citizen_update || `Your complaint has been routed to ${routing.departmentName}.`,
-    escalation_risk: aiResult?.escalation_risk || escalation.escalationReason,
-    routing_info: {
-      ...routing,
-      recommendations,
-      escalation,
-    },
-    agent_flow: {
-      intake: 'completed',
-      routing: 'completed',
-      drafting: 'ready',
-      compliance: 'ready',
-      action: 'ready',
-    },
+    category: aiResult.category || 'general',
+    department: aiResult.department || null,
+    priority: aiResult.priority || 'medium',
+    legal_strategy: aiResult.legal_strategy || null,
+    summary: aiResult.summary || null,
+    recommended_actions: recommendedActions,
+    escalation_risk: aiResult.escalation_risk || null,
+    manual_review: aiResult.manual_review === true,
+    citizen_name: fallbackInput.name || null,
+    citizen_phone: fallbackInput.phone || null,
+    location: fallbackInput.location || null,
   };
-}
+};
 
 export const complaintController = {
   createComplaint: async (req, res, next) => {
     try {
+      console.log('Incoming complaint body:', req.body);
       const {
         title,
         description,
+        complaint_text,
         location,
-        category: categoryFromRequest,
-        respondentName = '',
         userId,
+        name,
+        phone,
+        attachments,
       } = req.body || {};
 
+      const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+      const metadataAttachments = parseMetadataAttachments(attachments);
+      const resolvedDescription = description || complaint_text || '';
+      const resolvedTitle = buildResolvedTitle(title, resolvedDescription);
       const resolvedUserId = req.user?.id || userId || 'demo-user';
 
       const missingFields = [];
-      if (!title) missingFields.push('title');
-      if (!description) missingFields.push('description');
+      if (!resolvedDescription) missingFields.push('complaint_text');
       if (!location) missingFields.push('location');
 
       if (missingFields.length > 0) {
@@ -93,56 +75,135 @@ export const complaintController = {
           error: {
             status: 400,
             message: `Missing required field(s): ${missingFields.join(', ')}`,
-            required: ['title', 'description', 'location'],
+            required: ['complaint_text', 'location'],
           },
         });
       }
 
-      let aiResult;
+      // 1) Create complaint first so we always get a case ID (even if AI or attachment flow fails)
+      const baseComplaintPayload = {
+        user_id: resolvedUserId,
+        title: resolvedTitle,
+        description: resolvedDescription,
+        location,
+        category: 'general',
+        status: 'new',
+        priority: 'medium',
+        manual_review: false,
+        citizen_name: name || null,
+        citizen_phone: phone || null,
+      };
+
+      let complaint;
       try {
-        aiResult = await pythonService.callAIService({ text: description, location });
-      } catch (aiError) {
-        logger.warn('AI enrichment unavailable, using fallback response', aiError.message);
-        aiResult = pythonService.buildFallbackAIResult(description, location, aiError.message);
+        const { data, error } = await supabaseAdmin
+          .from('complaints')
+          .insert([baseComplaintPayload])
+          .select()
+          .single();
+
+        if (error) throw error;
+        complaint = data;
+      } catch (insertError) {
+        // Backward-compat fallback if some new columns are not migrated yet
+        logger.warn('Complaint insert with extended columns failed, retrying with minimal payload:', insertError.message);
+        const minimalPayload = {
+          user_id: resolvedUserId,
+          title: resolvedTitle,
+          description: resolvedDescription,
+          category: 'general',
+          status: 'new',
+          priority: 'medium',
+        };
+
+        const { data, error } = await supabaseAdmin
+          .from('complaints')
+          .insert([minimalPayload])
+          .select()
+          .single();
+
+        if (error) throw error;
+        complaint = data;
       }
 
-      const effectiveCategory = normalizeCategory(categoryFromRequest || aiResult?.category || 'general');
-      const workflowOutput = buildWorkflowOutput({
-        title,
-        description,
-        location,
-        category: effectiveCategory,
-        respondentName,
-        aiResult,
-      });
+      // 2) AI enrichment with fallback-safe behavior
+      let aiResult;
+      try {
+        aiResult = await pythonService.callAIService({
+          text: resolvedDescription,
+          location,
+        });
+      } catch (aiError) {
+        logger.warn('AI enrichment unavailable, using fallback response', aiError.message);
+        aiResult = pythonService.buildFallbackAIResult(resolvedDescription, location, aiError.message);
+      }
 
-      const complaintPayload = {
-        user_id: resolvedUserId,
-        title,
-        description,
-        category: effectiveCategory,
-        status: 'routed',
-        priority: workflowOutput.priority || 'medium',
+      // 3) Upload attachments (if multipart files exist), then persist attachment rows
+      const savedAttachments = await attachmentService.persistAttachments(
+        complaint.id,
+        uploadedFiles,
+        metadataAttachments
+      );
+
+      // 4) Update complaint with mapped AI fields while keeping raw ai_analysis for audit/debug
+      const aiAuditPayload = {
+        ...aiResult,
+        attachments: savedAttachments,
         ai_analysis: {
           ...aiResult,
-          ...workflowOutput,
+          attachments: savedAttachments,
           input: {
-            text: description,
+            text: resolvedDescription,
             location,
-            category: effectiveCategory,
-            respondentName,
+            citizen_name: name || null,
+            citizen_phone: phone || null,
+            attachments: metadataAttachments,
           },
         },
       };
 
-      const { data, error } = await supabase.from('complaints').insert([complaintPayload]).select().single();
-      if (error) throw error;
+      const mappedFields = mapTopLevelAiFields(aiResult, { name, phone, location });
+      const updatePayload = {
+        ...mappedFields,
+        ai_analysis: aiAuditPayload.ai_analysis,
+      };
+
+      let updatedComplaint = complaint;
+      const { data: updateData, error: updateError } = await supabaseAdmin
+        .from('complaints')
+        .update(updatePayload)
+        .eq('id', complaint.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        logger.warn(`Failed to update mapped AI fields on complaint ${complaint.id}:`, updateError.message);
+        const fallbackUpdate = {
+          category: aiResult.category || 'general',
+          priority: aiResult.priority || 'medium',
+          ai_analysis: aiAuditPayload.ai_analysis,
+        };
+
+        const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+          .from('complaints')
+          .update(fallbackUpdate)
+          .eq('id', complaint.id)
+          .select()
+          .single();
+
+        if (!fallbackError && fallbackData) {
+          updatedComplaint = fallbackData;
+        }
+      } else {
+        updatedComplaint = updateData;
+      }
 
       res.status(201).json({
         success: true,
-        caseId: data.id,
-        complaint: data,
-        aiResult: complaintPayload.ai_analysis,
+        caseId: complaint.id,
+        aiResult,
+        complaint: updatedComplaint,
+        attachments: savedAttachments,
       });
     } catch (error) {
       next(error);
@@ -151,19 +212,8 @@ export const complaintController = {
 
   getUserComplaints: async (req, res, next) => {
     try {
-      const userId = req.user?.id || req.query.userId || req.headers['x-user-id'];
-
-      if (!userId) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            status: 400,
-            message: 'userId is required. Provide login token or userId query/header.',
-          },
-        });
-      }
-
-      const { data, error } = await supabase
+      const userId = req.user.id;
+      const { data, error } = await supabaseAdmin
         .from('complaints')
         .select('*')
         .eq('user_id', userId)
@@ -179,27 +229,35 @@ export const complaintController = {
   getAllComplaints: async (req, res, next) => {
     try {
       const { filter = 'all' } = req.query;
-      let query = supabase.from('complaints').select('*');
+      let query = supabaseAdmin.from('complaints').select('*');
 
       if (filter !== 'all') {
         query = query.eq('status', filter);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
-      if (error) throw error;
-      res.json(data);
-    } catch (error) {
-      next(error);
-    }
-  },
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+},
 
   getComplaintById: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { data, error } = await supabase.from('complaints').select('*').eq('id', id).single();
+      const { data, error } = await supabaseAdmin
+        .from('complaints')
+        .select('*')
+        .eq('id', id)
+        .single();
 
       if (error) throw error;
-      res.json(data);
+      const attachments = await attachmentService.getComplaintAttachments(id);
+      res.json({
+        ...data,
+        attachments,
+      });
     } catch (error) {
       next(error);
     }
@@ -210,7 +268,7 @@ export const complaintController = {
       const { id } = req.params;
       const { status } = req.body;
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('complaints')
         .update({ status, updated_at: new Date() })
         .eq('id', id)
@@ -227,7 +285,10 @@ export const complaintController = {
   deleteComplaint: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { error } = await supabase.from('complaints').delete().eq('id', id);
+      const { error } = await supabaseAdmin
+        .from('complaints')
+        .delete()
+        .eq('id', id);
 
       if (error) throw error;
       res.status(204).send();

@@ -315,6 +315,12 @@ export default function StaffWorkspace() {
                     <div className="p-6">
                       {tabs === 'details' && (
                         <div className="space-y-4">
+                          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                            <p className="text-sm text-emerald-800 font-semibold mb-1">Staff Action Note</p>
+                            <p className="text-sm text-emerald-900">
+                              {selectedComplaint.ai_analysis?.staff_action_note || 'No staff action note available yet.'}
+                            </p>
+                          </div>
                           <div>
                             <p className="text-sm text-gray-600">Category</p>
                             <p className="font-semibold text-gray-900">{selectedComplaint.category}</p>

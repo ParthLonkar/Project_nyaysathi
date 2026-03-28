@@ -2,22 +2,54 @@ import api from './api';
 
 export const complaintService = {
   submitComplaint: async (formData) => {
+    const complaintText = formData.complaintText || formData.description || '';
+    const generatedTitle = complaintText.trim()
+      ? complaintText.trim().split('.').shift().slice(0, 80)
+      : 'Civic complaint';
+
     const payload = {
-      title: formData.title,
-      description: formData.description,
+      complaint_text: complaintText,
+      title: formData.title || generatedTitle || 'Civic complaint',
+      description: formData.description || complaintText,
       location: formData.location,
-      category: formData.category || 'general',
-      respondentName: formData.respondentName || '',
-      userId: formData.userId || localStorage.getItem('demoUserId') || 'demo-user',
+      userId: formData.userId || 'demo-user',
+      name: formData.name || formData.fullName || '',
+      phone: formData.phone || '',
+      attachments: (formData.attachments || []).map((file) => ({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      })),
     };
 
-    const response = await api.post('/complaints', payload);
+    let response;
+    if ((formData.attachments || []).length > 0) {
+      const multipart = new FormData();
+      multipart.append('complaint_text', payload.complaint_text);
+      multipart.append('title', payload.title);
+      multipart.append('description', payload.description);
+      multipart.append('location', payload.location);
+      multipart.append('userId', payload.userId);
+      multipart.append('name', payload.name);
+      multipart.append('phone', payload.phone);
+      multipart.append('attachments', JSON.stringify(payload.attachments));
+
+      (formData.attachments || []).forEach((file) => {
+        multipart.append('attachments', file);
+      });
+
+      response = await api.post('/complaints', multipart, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    } else {
+      response = await api.post('/complaints', payload);
+    }
+
     return response.data;
   },
 
   getMyComplaints: async () => {
-    const userId = localStorage.getItem('demoUserId') || 'demo-user';
-    const response = await api.get('/complaints/my', { params: { userId } });
+    const response = await api.get('/complaints/my');
     return response.data;
   },
 
@@ -36,4 +68,3 @@ export const complaintService = {
     return response.data;
   },
 };
-

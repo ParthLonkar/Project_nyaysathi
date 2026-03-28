@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { CheckCircle, AlertCircle, Zap, Shield, Clock } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 
 export default function SubmissionConfirmation() {
   const navigate = useNavigate();
@@ -29,7 +29,8 @@ export default function SubmissionConfirmation() {
     );
   }
 
-  const complaintId = `NYA-${Date.now().toString().slice(-8)}`;
+  const complaintId = complaintData.complaintId || `NYA-${Date.now().toString().slice(-8)}`;
+  const citizenUpdate = complaintData.citizen_update || complaintData.aiResult?.citizen_update;
 
   return (
     <Layout>
@@ -50,7 +51,7 @@ export default function SubmissionConfirmation() {
           <div className="text-center mb-16">
             <h1 className="section-header mb-4 text-green-900">Complaint Submitted Successfully!</h1>
             <p className="section-subheader text-lg">
-              Your complaint has been received and is now being processed by our AI system. A confirmation email has been sent to <strong>{complaintData.email}</strong>
+              Your complaint has been received and is now being processed by our AI system.
             </p>
           </div>
 
@@ -86,24 +87,24 @@ export default function SubmissionConfirmation() {
               </h3>
               <div className="space-y-6">
                 <div>
-                  <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Category</p>
-                  <p className="text-lg text-gray-900 font-black">{complaintData.category || 'General'}</p>
+                  <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Reported By</p>
+                  <p className="text-lg text-gray-900 font-black">{complaintData.name || 'Anonymous Citizen'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Subject</p>
-                  <p className="text-lg text-gray-900 font-bold">{complaintData.title}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Against</p>
-                  <p className="text-lg text-gray-900 font-bold">{complaintData.respondentName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Date of Incident</p>
-                  <p className="text-lg text-gray-900 font-bold">{complaintData.incidentDate}</p>
+                  <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Phone</p>
+                  <p className="text-lg text-gray-900 font-bold">{complaintData.phone || 'Not provided'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Location</p>
-                  <p className="text-lg text-gray-900 font-bold">{complaintData.location}</p>
+                  <p className="text-lg text-gray-900 font-bold">{complaintData.location || 'Not provided'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Attachments</p>
+                  <p className="text-lg text-gray-900 font-bold">{complaintData.attachments?.length || 0} file(s)</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 font-bold uppercase tracking-wide mb-2">Complaint Text</p>
+                  <p className="text-sm text-gray-800 leading-relaxed">{complaintData.complaintText}</p>
                 </div>
               </div>
             </div>
@@ -134,6 +135,13 @@ export default function SubmissionConfirmation() {
               </div>
             </div>
           </div>
+
+          {citizenUpdate && (
+            <div className="card p-8 mb-12 border border-green-200 bg-green-50/60">
+              <p className="text-sm text-green-800 font-bold uppercase tracking-wide mb-2">Citizen Update</p>
+              <p className="text-green-900 font-medium">{citizenUpdate}</p>
+            </div>
+          )}
 
           {/* Important Information */}
           <div className="card-premium p-10 mb-12 border-2 border-blue-300">
