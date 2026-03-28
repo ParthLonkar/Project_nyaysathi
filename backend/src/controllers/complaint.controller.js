@@ -3,6 +3,7 @@ import { pythonService } from '../services/python.service.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { attachmentService } from '../services/attachment.service.js';
 import { routeComplaint, generateRoutingRecommendations } from '../services/routing.service.js';
+import { actionAgentService } from '../services/action-agent.service.js';
 
 const REFERENCE_ID_REGEX = /^Ref-\d{4}-\d{6}$/;
 
@@ -234,6 +235,7 @@ export const complaintController = {
         category: aiResult?.category || routingDecision.category || 'general',
         description: resolvedDescription,
       });
+      const actionPlan = actionAgentService.buildActionPlan({ aiResult, routingDecision });
 
       const savedAttachments = await attachmentService.persistAttachments(
         complaint.id,
@@ -247,12 +249,12 @@ export const complaintController = {
 
       const aiAuditPayload = {
         ...aiResult,
-        routing_info: routingDecision,
+        routing_info: actionPlan.routing_info,
         routing_recommendations: routingRecommendations,
         attachments: savedAttachments,
         ai_analysis: {
           ...aiResult,
-          routing_info: routingDecision,
+          routing_info: actionPlan.routing_info,
           routing_recommendations: routingRecommendations,
           agent_flow: {
             intake: 'completed',
@@ -275,7 +277,13 @@ export const complaintController = {
       const mappedFields = mapTopLevelAiFields(aiResult, { name, phone, location }, routingDecision);
       const updatePayload = {
         ...mappedFields,
-        routing_info: routingDecision,
+        status: actionPlan.status,
+        progress_percentage: actionPlan.progress_percentage,
+        routing_info: actionPlan.routing_info,
+        escalation_flag: actionPlan.escalation_flag,
+        is_urgent: actionPlan.is_urgent,
+        admin_classification: actionPlan.admin_classification,
+        manual_review: actionPlan.manual_review,
         ai_analysis: aiAuditPayload.ai_analysis,
       };
 
@@ -292,6 +300,10 @@ export const complaintController = {
         const fallbackUpdate = {
           category: aiResult.category || routingDecision.category || 'general',
           priority: aiResult.priority || routingDecision.priority || 'medium',
+          status: actionPlan.status,
+          progress_percentage: actionPlan.progress_percentage,
+          routing_info: actionPlan.routing_info,
+          manual_review: actionPlan.manual_review,
           ai_analysis: aiAuditPayload.ai_analysis,
         };
 
@@ -311,10 +323,27 @@ export const complaintController = {
         logger.info(`Complaint AI mapped update success: ${complaint.id}`);
       }
 
+      await actionAgentService.createInitialTimelineEntry({
+        complaintId: complaint.id,
+        note: actionPlan.timeline_note,
+        status: actionPlan.status,
+      });
+
       res.status(201).json({
         success: true,
         caseId: updatedComplaint?.reference_id || complaint.id,
-        aiResult: { ...aiResult, routing_info: routingDecision, routing_recommendations: routingRecommendations },
+        aiResult: {
+          ...aiResult,
+          routing_info: actionPlan.routing_info,
+          routing_recommendations: routingRecommendations,
+          action_agent: {
+            status: actionPlan.status,
+            progress_percentage: actionPlan.progress_percentage,
+            escalation_flag: actionPlan.escalation_flag,
+            admin_classification: actionPlan.admin_classification,
+            is_urgent: actionPlan.is_urgent,
+          },
+        },
         complaint: updatedComplaint,
         attachments: savedAttachments,
       });

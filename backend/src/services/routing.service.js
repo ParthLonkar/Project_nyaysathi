@@ -4,8 +4,56 @@ import { logger } from '../utils/logger.js';
  * Department Routing Configuration
  */
 const DEPARTMENTS = {
+  water: {
+    name: 'Water Department',
+    code: 'WD',
+    email: 'water@municipal.gov.in',
+    sla: 14,
+  },
+  electricity: {
+    name: 'Electricity Board',
+    code: 'EB',
+    email: 'support@electricityboard.gov.in',
+    sla: 10,
+  },
+  sanitation: {
+    name: 'Municipal Sanitation',
+    code: 'MS',
+    email: 'sanitation@municipal.gov.in',
+    sla: 14,
+  },
+  roads: {
+    name: 'Public Works / Roads',
+    code: 'PWD',
+    email: 'roads@pwd.gov.in',
+    sla: 21,
+  },
+  police: {
+    name: 'Police Department',
+    code: 'PD',
+    email: 'complaints@police.gov.in',
+    sla: 7,
+  },
+  education: {
+    name: 'Education Department',
+    code: 'EDU',
+    email: 'grievance@education.gov.in',
+    sla: 30,
+  },
+  revenue: {
+    name: 'Revenue Department',
+    code: 'REV',
+    email: 'revenue@state.gov.in',
+    sla: 30,
+  },
+  social_welfare: {
+    name: 'Social Welfare Department',
+    code: 'SWD',
+    email: 'welfare@state.gov.in',
+    sla: 30,
+  },
   consumer: {
-    name: 'Consumer Protection Authority',
+    name: 'Consumer Grievance Cell',
     code: 'CPA',
     email: 'complaints@consumer.gov.in',
     sla: 30, // days
@@ -34,10 +82,16 @@ const DEPARTMENTS = {
     email: 'complaints@police.gov.in',
     sla: 7,
   },
+  corruption: {
+    name: 'Vigilance / Anti-Corruption Cell',
+    code: 'VAC',
+    email: 'vigilance@state.gov.in',
+    sla: 15,
+  },
   general: {
-    name: 'General Complaint Bureau',
+    name: 'Municipal Grievance Cell',
     code: 'GCB',
-    email: 'general@complaint.gov.in',
+    email: 'general@municipal.gov.in',
     sla: 30,
   },
 };
@@ -102,9 +156,19 @@ function calculatePriority(complaintData) {
  */
 function routeComplaint(complaintData) {
   const { category = 'general', location = 'India' } = complaintData;
+  const normalizedCategory = String(category || 'general').toLowerCase();
+
+  const categoryAliases = {
+    public_works: 'roads',
+    public_works_roads: 'roads',
+    road: 'roads',
+    garbage: 'sanitation',
+    welfare: 'social_welfare',
+  };
+  const resolvedCategory = categoryAliases[normalizedCategory] || normalizedCategory;
 
   // Get department from category
-  const department = DEPARTMENTS[category] || DEPARTMENTS.general;
+  const department = DEPARTMENTS[resolvedCategory] || DEPARTMENTS.general;
 
   // Calculate priority
   const priority = calculatePriority(complaintData);
@@ -114,7 +178,7 @@ function routeComplaint(complaintData) {
     departmentCode: department.code,
     departmentName: department.name,
     departmentEmail: department.email,
-    category,
+    category: resolvedCategory,
     location,
     priority: priority.level,
     priorityScore: priority.score,
@@ -124,7 +188,7 @@ function routeComplaint(complaintData) {
     estimatedResolutionDate: new Date(Date.now() + department.sla * 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  logger.info(`Complaint routed to ${department.name} (Priority: ${priority.level})`);
+  logger.info(`Complaint routed to ${department.name} [${resolvedCategory}] (Priority: ${priority.level})`);
   return routing;
 }
 
