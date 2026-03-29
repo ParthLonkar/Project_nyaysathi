@@ -622,7 +622,6 @@ export default function AdminDashboard() {
                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Category</th>
                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Priority</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assigned</th>
                         <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
                       </tr>
                     </thead>
@@ -649,9 +648,6 @@ export default function AdminDashboard() {
                             <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-black uppercase ${getPriorityColor(complaint.priority)}`}>
                               {complaint.priority}
                             </span>
-                          </td>
-                          <td className="px-6 py-4 text-xs font-semibold">
-                            {complaint.department_staff?.staff_name || 'Unassigned'}
                           </td>
                           <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
                             {!complaint.assigned_staff_id && (

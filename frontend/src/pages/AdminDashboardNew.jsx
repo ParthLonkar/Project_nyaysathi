@@ -324,7 +324,6 @@ export default function AdminDashboardNew() {
                     <th className="px-6 py-4">Complainant</th>
                     <th className="px-6 py-4">Subject Matter</th>
                     <th className="px-6 py-4">Filing Date</th>
-                    <th className="px-6 py-4">Assigned To</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-8 py-4 text-right">Actions</th>
                   </tr>
