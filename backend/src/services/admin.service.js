@@ -135,25 +135,30 @@ export const adminService = {
           documentsByComplaint = groupDocumentsByComplaint(documentRows || []);
         }
 
-        // Fetch staff assignments first (include all statuses, not just active)
-        const { data: assignmentRows, error: assignmentError } = await supabase
+        // Fetch staff assignments using admin client (bypass RLS if needed)
+        const adminClient = writeClient();
+        const usingServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+        logger.info(`Fetching staff assignments using ${usingServiceRole ? 'service role' : 'anon'} client`);
+        
+        const { data: assignmentRows, error: assignmentError } = await adminClient
           .from('staff_assignments')
           .select('complaint_id, staff_id, status, assigned_at')
           .in('complaint_id', complaintIds)
           .not('staff_id', 'is', null);
 
+        if (assignmentError) {
+          logger.error('Staff assignments fetch error:', assignmentError);
+        }
         logger.info(`Fetched ${assignmentRows?.length || 0} assignments for ${complaintIds.length} complaints`);
 
-        if (assignmentError) {
-          logger.warn('Get staff assignments warning:', assignmentError.message);
-        } else if (assignmentRows && assignmentRows.length > 0) {
+        if (assignmentRows && assignmentRows.length > 0) {
           // Get unique staff IDs
           const staffIds = [...new Set(assignmentRows.map(a => a.staff_id).filter(Boolean))];
           logger.info(`Found ${staffIds.length} unique staff IDs from assignments:`, staffIds);
           
-          // Fetch staff details
+          // Fetch staff details using admin client
           if (staffIds.length > 0) {
-            const { data: staffRows, error: staffError } = await supabase
+            const { data: staffRows, error: staffError } = await adminClient
               .from('department_staff')
               .select('id, staff_name, position, email')
               .in('id', staffIds);
