@@ -9,6 +9,12 @@ class ComplaintState(BaseModel):
     title: str
     description: str
     category: str
+    customer_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    aadhaar: Optional[str] = None
+    reference_id: Optional[str] = None
     legal_analysis: Optional[dict] = None
     draft_document: Optional[str] = None
     complaint_draft: Optional[str] = None

@@ -55,9 +55,11 @@ async def draft_document(state):
     # Generate PDF documents (best-effort; never block text drafting flow)
     complaint_data = {
         "complaint_id": getattr(state, "complaint_id", "Not Assigned"),
+        "reference_id": getattr(state, "reference_id", None),
         "title": getattr(state, "title", "Citizen Complaint"),
-        "description": description,
+        "description": state.improved_text,
         "customer_name": getattr(state, "customer_name", "Not Provided"),
+        "name": getattr(state, "customer_name", "Not Provided"),
         "email": getattr(state, "email", "Not Provided"),
         "phone": getattr(state, "phone", "Not Provided"),
         "location": location or "Not Provided",

@@ -205,45 +205,55 @@ export default function StaffCaseDetails() {
                 <h3 className="font-headline font-bold text-xl text-primary">Relevant Documents</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="group bg-surface-container-lowest p-4 rounded-xl flex items-center gap-4 transition-all hover:shadow-md hover:bg-white border border-transparent hover:border-outline-variant/10">
-                  <div className="h-12 w-12 bg-error-container flex items-center justify-center rounded-lg text-error">
-                    <span className="material-symbols-outlined">picture_as_pdf</span>
+                {complaint?.documents && complaint.documents.length > 0 ? (
+                  complaint.documents.map((doc, idx) => {
+                    const getFileIcon = (docType) => {
+                      if (docType.includes('pdf')) return 'picture_as_pdf';
+                      if (docType.includes('image') || docType.includes('jpg') || docType.includes('png')) return 'image';
+                      if (docType.includes('docx') || docType.includes('doc')) return 'description';
+                      return 'attachment';
+                    };
+
+                    const getColorClass = (docType) => {
+                      if (docType.includes('pdf') || docType.includes('rti')) return 'error-container';
+                      if (docType.includes('image')) return 'secondary-container';
+                      return 'primary-fixed';
+                    };
+
+                    const getTextColorClass = (docType) => {
+                      if (docType.includes('pdf') || docType.includes('rti')) return 'text-error';
+                      if (docType.includes('image')) return 'text-on-secondary-container';
+                      return 'text-on-primary-fixed';
+                    };
+
+                    return (
+                      <div key={idx} className="group bg-surface-container-lowest p-4 rounded-xl flex items-center gap-4 transition-all hover:shadow-md hover:bg-white border border-transparent hover:border-outline-variant/10">
+                        <div className={`h-12 w-12 bg-${getColorClass(doc.document_type)} flex items-center justify-center rounded-lg ${getTextColorClass(doc.document_type)}`}>
+                          <span className="material-symbols-outlined">{getFileIcon(doc.document_type)}</span>
+                        </div>
+                        <div className="flex-grow">
+                          <p className="text-sm font-bold text-primary">{doc.file_name}</p>
+                          <p className="text-[11px] text-slate-400 font-medium">{doc.document_type.replace(/_/g, ' ')}</p>
+                        </div>
+                        <a 
+                          href={doc.public_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-100 rounded-lg text-slate-500"
+                        >
+                          <span className="material-symbols-outlined text-sm">download</span>
+                        </a>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-2 text-center py-8 text-slate-500">
+                    <span className="material-symbols-outlined text-4xl text-slate-300 block mb-2">folder_open</span>
+                    <p className="text-sm">No documents attached yet</p>
                   </div>
-                  <div className="flex-grow">
-                    <p className="text-sm font-bold text-primary">Initial_Contract_AD992.pdf</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 12, 2024 � 2.4 MB</p>
-                  </div>
-                  <button className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-100 rounded-lg text-slate-500">
-                    <span className="material-symbols-outlined text-sm">download</span>
-                  </button>
-                </div>
-                <div className="group bg-surface-container-lowest p-4 rounded-xl flex items-center gap-4 transition-all hover:shadow-md hover:bg-white border border-transparent hover:border-outline-variant/10">
-                  <div className="h-12 w-12 bg-secondary-container flex items-center justify-center rounded-lg text-on-secondary-container">
-                    <span className="material-symbols-outlined">image</span>
-                  </div>
-                  <div className="flex-grow">
-                    <p className="text-sm font-bold text-primary">Site_Survey_Photo_01.jpg</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 12, 2024 � 4.1 MB</p>
-                  </div>
-                  <button className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-100 rounded-lg text-slate-500">
-                    <span className="material-symbols-outlined text-sm">download</span>
-                  </button>
-                </div>
-                <div className="group bg-surface-container-lowest p-4 rounded-xl flex items-center gap-4 transition-all hover:shadow-md hover:bg-white border border-transparent hover:border-outline-variant/10">
-                  <div className="h-12 w-12 bg-primary-fixed flex items-center justify-center rounded-lg text-on-primary-fixed">
-                    <span className="material-symbols-outlined">description</span>
-                  </div>
-                  <div className="flex-grow">
-                    <p className="text-sm font-bold text-primary">Technical_Specs_Annexure_IV.docx</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Uploaded Jan 15, 2024 � 840 KB</p>
-                  </div>
-                  <button className="opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-slate-100 rounded-lg text-slate-500">
-                    <span className="material-symbols-outlined text-sm">download</span>
-                  </button>
-                </div>
+                )}
               </div>
             </section>
-
             <section>
               <div className="flex items-center gap-3 mb-8 ml-2">
                 <span className="material-symbols-outlined text-primary">history</span>

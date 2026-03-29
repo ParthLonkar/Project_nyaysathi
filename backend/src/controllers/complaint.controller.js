@@ -219,6 +219,12 @@ export const complaintController = {
         aiResult = await pythonService.callAIService({
           text: resolvedDescription,
           location,
+          name: name || null,
+          email: null,  // Not in current form
+          phone: phone || null,
+          address: location || null,
+          aadhaar: null,  // Not in current form
+          reference_id: complaint.reference_id || null,
         });
         logger.info(
           `AI enrichment success for complaint ${complaint.id}`,

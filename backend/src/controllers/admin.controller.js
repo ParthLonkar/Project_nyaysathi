@@ -335,6 +335,39 @@ export const adminController = {
       logger.error('downloadDailyReportPDF controller error:', error);
       return res.status(500).json({ success: false, error: 'Failed to generate report PDF: ' + error.message });
     }
+  },
+
+  /**
+   * Get RTI PDF for a specific complaint
+   * GET /admin/complaints/:complaintId/rti-pdf
+   */
+  getRtiPdf: async (req, res) => {
+    try {
+      const { complaintId } = req.params;
+      const { department_id } = req.user;
+
+      if (!complaintId) {
+        return res.status(400).json({ error: 'Complaint ID required' });
+      }
+
+      const result = await adminService.getRtiPdf(complaintId, department_id);
+
+      if (!result.success) {
+        return res.status(404).json(result);
+      }
+
+      logger.info(`RTI PDF retrieved for complaint ${complaintId}: ${result.fileName}`);
+      return res.json({
+        success: true,
+        fileName: result.fileName,
+        pdfUrl: result.pdfUrl,
+        documentId: result.documentId,
+        createdAt: result.createdAt
+      });
+    } catch (error) {
+      logger.error('Get RTI PDF error:', error);
+      return res.status(500).json({ error: 'Failed to get RTI PDF' });
+    }
   }
 };
 

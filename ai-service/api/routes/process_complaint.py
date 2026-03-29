@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from time import perf_counter
+from typing import Optional
+import base64
 
 from app.agents import intake_agent, legal_agent, drafting_agent, compliance_agent, priority_agent, action_agent
 from app.graph.state import ComplaintState
@@ -15,6 +17,12 @@ router = APIRouter()
 class ProcessComplaintRequest(BaseModel):
     text: str
     location: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    aadhaar: Optional[str] = None
+    reference_id: Optional[str] = None
 
 
 class ProcessComplaintResponse(BaseModel):
@@ -34,6 +42,8 @@ class ProcessComplaintResponse(BaseModel):
     escalation_risk: str
     complaint_draft: str
     rti_draft: str
+    complaint_pdf: Optional[str] = None
+    rti_pdf: Optional[str] = None
     document_valid: bool
     document_notes: str
     agent_flow: dict
@@ -58,6 +68,12 @@ async def process_complaint(payload: ProcessComplaintRequest):
         title=(text[:80] if text else "Citizen complaint"),
         description=text,
         category="general",
+        customer_name=payload.name,
+        email=payload.email,
+        phone=payload.phone,
+        address=payload.address,
+        aadhaar=payload.aadhaar,
+        reference_id=payload.reference_id,
     )
 
     state = await intake_agent.process_intake(initial_state)
@@ -91,6 +107,15 @@ async def process_complaint(payload: ProcessComplaintRequest):
       state.document_valid = state.document_valid if state.document_valid is not None else docs.get("document_valid", False)
       state.document_notes = state.document_notes or docs.get("document_notes", "")
 
+    # Encode PDFs as base64 for JSON serialization
+    complaint_pdf_b64 = None
+    if state.complaint_pdf and isinstance(state.complaint_pdf, bytes):
+        complaint_pdf_b64 = base64.b64encode(state.complaint_pdf).decode('utf-8')
+    
+    rti_pdf_b64 = None
+    if state.rti_pdf and isinstance(state.rti_pdf, bytes):
+        rti_pdf_b64 = base64.b64encode(state.rti_pdf).decode('utf-8')
+
     result = {
         "category": legal_analysis.get("category") or state.category or enrichment.get("category", "general"),
         "department": legal_analysis.get("department") or enrichment.get("department", "Municipal Grievance Cell"),
@@ -108,6 +133,8 @@ async def process_complaint(payload: ProcessComplaintRequest):
         "escalation_risk": enrichment.get("escalation_risk", ""),
         "complaint_draft": state.complaint_draft or "",
         "rti_draft": state.rti_draft or "",
+        "complaint_pdf": complaint_pdf_b64,
+        "rti_pdf": rti_pdf_b64,
         "document_valid": bool(state.document_valid),
         "document_notes": state.document_notes or "",
         "agent_flow": agent_flow,
@@ -124,7 +151,9 @@ async def process_complaint(payload: ProcessComplaintRequest):
             "category": result.get("category"),
             "department": result.get("department"),
             "priority": result.get("priority"),
-            "has_rti": bool(result.get("rti_draft")),
+            "has_rti_draft": bool(result.get("rti_draft")),
+            "has_rti_pdf": bool(result.get("rti_pdf")),
+            "has_complaint_pdf": bool(result.get("complaint_pdf")),
         },
     )
 

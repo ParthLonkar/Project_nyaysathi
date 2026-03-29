@@ -48,7 +48,7 @@ def generate_rti_pdf(complaint_data: dict) -> bytes:
         textColor=colors.HexColor('#1a1a1a'),
         spaceAfter=6,
         spaceBefore=6,
-        alignment=2,
+        alignment=0,
         fontName='Helvetica-Bold'
     )
     
@@ -62,25 +62,38 @@ def generate_rti_pdf(complaint_data: dict) -> bytes:
     )
     
     # Extract data with defaults
-    applicant_name = complaint_data.get('customer_name', 'Not Provided')
-    applicant_address = complaint_data.get('address', 'Not Provided')
-    applicant_email = complaint_data.get('email', 'Not Provided')
-    applicant_phone = complaint_data.get('phone', 'Not Provided')
-    applicant_aadhaar = complaint_data.get('aadhaar', 'Not Provided')
+    applicant_name = complaint_data.get('customer_name', '') or complaint_data.get('name', '') or 'Not Provided'
+    applicant_address = complaint_data.get('address', '') or complaint_data.get('location', '') or 'Not Provided'
+    applicant_email = complaint_data.get('email', '') or 'Not Provided'
+    applicant_phone = complaint_data.get('phone', '') or 'Not Provided'
+    applicant_aadhaar = complaint_data.get('aadhaar', '') or 'Not Provided'
     
     department = complaint_data.get('department', 'Concerned Department')
     location = complaint_data.get('location', 'Not Provided')
     complaint_title = complaint_data.get('title', 'Citizen Complaint')
     complaint_description = complaint_data.get('description', 'Not Provided')
-    complaint_id = complaint_data.get('complaint_id', 'Not Assigned')
+    
+    # Use reference_id if available, otherwise use complaint_id
+    reference_id = complaint_data.get('reference_id', complaint_data.get('complaint_id', 'Not Assigned'))
+    complaint_id = reference_id
     
     # Title
     elements.append(Paragraph("RTI application", title_style))
     elements.append(Spacer(1, 0.15*inch))
     
-    # Date and complaint ID on right
-    date_text = f"<b>Date:</b> {datetime.now().strftime('%d-%m-%Y')}<br/><b>Complaint ID:</b> #{complaint_id}"
-    elements.append(Paragraph(date_text, normal_style))
+    # Date and reference ID header
+    header_data = [
+        ['', f"Date: {datetime.now().strftime('%d-%m-%Y')}"],
+        ['', f"Reference ID: {complaint_id}"]
+    ]
+    header_table = Table(header_data, colWidths=[3*inch, 2.5*inch])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+    ]))
+    elements.append(header_table)
     elements.append(Spacer(1, 0.2*inch))
     
     # FROM SECTION
@@ -88,8 +101,7 @@ def generate_rti_pdf(complaint_data: dict) -> bytes:
     from_data = [
         ['Applicant\'s name', applicant_name],
         ['Address', applicant_address],
-        ['Email, Mobile', f'{applicant_email}, {applicant_phone}'],
-        ['Aadhaar no', applicant_aadhaar]
+        ['Mobile', applicant_phone]
     ]
     
     from_table = Table(from_data, colWidths=[1.5*inch, 4*inch])
@@ -224,18 +236,25 @@ def generate_complaint_draft_pdf(complaint_data: dict, complaint_draft: str) -> 
     )
     
     # Header
+    reference_id = complaint_data.get('reference_id', complaint_data.get('complaint_id', 'Not Assigned'))
+    applicant_name = complaint_data.get('customer_name', '') or complaint_data.get('name', '') or 'Not Provided'
+    
     elements.append(Paragraph("FORMAL COMPLAINT DRAFT", title_style))
-    elements.append(Paragraph(f"Complaint ID: #{complaint_data.get('complaint_id', 'Not Assigned')}", normal_style))
+    elements.append(Paragraph(f"Reference ID: {reference_id}", normal_style))
     elements.append(Paragraph(f"Date Generated: {datetime.now().strftime('%d-%m-%Y %H:%M')}", normal_style))
     elements.append(Spacer(1, 0.2*inch))
     
     # Applicant Details
     elements.append(Paragraph("<b>Applicant Details:</b>", normal_style))
+    applicant_email = complaint_data.get('email', '') or 'Not Provided'
+    applicant_phone = complaint_data.get('phone', '') or 'Not Provided'
+    applicant_location = complaint_data.get('location', '') or 'Not Provided'
+    
     applicant_text = f"""
-    Name: {complaint_data.get('customer_name', 'Not Provided')}<br/>
-    Email: {complaint_data.get('email', 'Not Provided')}<br/>
-    Phone: {complaint_data.get('phone', 'Not Provided')}<br/>
-    Location: {complaint_data.get('location', 'Not Provided')}
+    Name: {applicant_name}<br/>
+    Email: {applicant_email}<br/>
+    Phone: {applicant_phone}<br/>
+    Location: {applicant_location}
     """
     elements.append(Paragraph(applicant_text, normal_style))
     elements.append(Spacer(1, 0.15*inch))

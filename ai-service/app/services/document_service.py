@@ -13,6 +13,13 @@ OFFENSIVE_WORDS_MAP = {
     "bastard": "individual",
     "harami": "individual",
     "kamina": "individual",
+    "fuck": "regret",
+    "shit": "issue",
+    "damn": "very",
+    "crap": "problem",
+    "asshole": "individual",
+    "bitch": "person",
+    "prick": "person",
 }
 
 
@@ -41,10 +48,27 @@ def _extract_json(raw: str) -> Optional[dict]:
 
 
 def improve_text(text: str) -> str:
+    """Sanitize and improve text to professional tone using LLM."""
     sanitized = _sanitize_abusive_language(text)
     if not sanitized.strip():
         return "Citizen submitted an empty complaint. Manual clarification required."
-    return sanitized
+
+    prompt = f"""
+You are a civic grievance writing assistant.
+Rewrite the following complaint in formal, clear, respectful, and professional English.
+Preserve all factual meaning. Do not invent details. Remove all informal language.
+Return only the improved complaint text, nothing else.
+
+Complaint:
+{sanitized}
+"""
+    try:
+        response = llm.invoke(prompt)
+        content = (response.content or "").strip()
+        return content if content else sanitized
+    except Exception as e:
+        log_info(f"LLM improvement failed, using sanitized text: {str(e)}")
+        return sanitized
 
 
 def _department_line(department: Optional[str]) -> str:

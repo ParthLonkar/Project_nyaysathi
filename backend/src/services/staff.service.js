@@ -42,15 +42,7 @@ export const staffService = {
             status,
             progress_percentage,
             sla_days,
-<<<<<<< HEAD
             submitted_at
-=======
-            submitted_at,
-            citizen_name,
-            citizen_phone,
-            citizen_email,
-            ai_analysis
->>>>>>> c3d1cc5 (feat: Add complaint PDF genration)
           )
         `)
         .eq('staff_id', staffId)
@@ -129,7 +121,7 @@ export const staffService = {
         return { success: false, error: 'Complaint data not available' };
       }
 
-      // Fetch related notes and visits if needed
+      // Fetch related notes, visits, and documents
       const { data: notes } = await client
         .from('complaint_notes')
         .select('*')
@@ -142,14 +134,28 @@ export const staffService = {
         .eq('complaint_id', complaintId)
         .order('visit_date', { ascending: false });
 
-      logger.info(`Successfully fetched complaint details for complaint_id=${complaintId}`);
+      // Fetch documents including RTI PDF
+      const { data: documents } = await client
+        .from('complaint_documents')
+        .select('id, document_type, file_name, storage_path, public_url, created_at')
+        .eq('complaint_id', complaintId)
+        .order('created_at', { ascending: false });
+
+      const rtiPdf = documents?.find(d => d.document_type === 'rti_pdf');
+
+      logger.info(`Successfully fetched complaint details for complaint_id=${complaintId} with ${documents?.length || 0} documents`);
+      if (rtiPdf) {
+        logger.info(`RTI PDF available for complaint ${complaintId}: ${rtiPdf.file_name}`);
+      }
 
       return { 
         success: true, 
         complaint: {
           ...complaint,
           complaint_notes: notes || [],
-          field_visits: visits || []
+          field_visits: visits || [],
+          documents: documents || [],
+          rti_pdf_url: rtiPdf?.public_url || null
         }
       };
     } catch (error) {

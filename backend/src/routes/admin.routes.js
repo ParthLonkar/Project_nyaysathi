@@ -43,4 +43,7 @@ router.get('/daily-report', verifyToken, verifyAdminRole, adminController.getDai
 // Download daily report as PDF
 router.get('/daily-report/download/pdf', verifyToken, verifyAdminRole, adminController.downloadDailyReportPDF);
 
+// Get RTI PDF for a complaint
+router.get('/complaints/:complaintId/rti-pdf', verifyToken, verifyAdminRole, adminController.getRtiPdf);
+
 export default router;

@@ -205,6 +205,24 @@ export const adminService = {
         return { success: false, error: 'Failed to assign complaint' };
       }
 
+      // Fetch RTI PDF and other documents for inclusion in assignment notification
+      try {
+        const { data: documents } = await supabase
+          .from('complaint_documents')
+          .select('id, document_type, file_name, public_url, storage_path')
+          .eq('complaint_id', complaintId)
+          .in('document_type', ['rti_pdf', 'complaint_pdf']);
+
+        if (documents && documents.length > 0) {
+          const rtiDoc = documents.find(d => d.document_type === 'rti_pdf');
+          if (rtiDoc) {
+            logger.info(`RTI PDF attached to staff assignment: ${rtiDoc.file_name} (${rtiDoc.public_url})`);
+          }
+        }
+      } catch (docError) {
+        logger.warn('Failed to fetch documents for assignment notification:', docError.message);
+      }
+
       const { error: updateError } = await client
         .from('complaints')
         .update({
@@ -523,6 +541,59 @@ export const adminService = {
     } catch (error) {
       logger.error('getDailyReport error:', error);
       return { success: false, error: 'Failed to generate daily report: ' + error.message };
+    }
+  },
+
+  /**
+   * Get RTI PDF for a specific complaint
+   */
+  getRtiPdf: async (complaintId, departmentId) => {
+    try {
+      // First verify the complaint belongs to the department
+      const { data: complaint, error: complaintError } = await supabase
+        .from('complaints')
+        .select('id, reference_id')
+        .eq('id', complaintId)
+        .single();
+
+      if (complaintError || !complaint) {
+        logger.warn(`Complaint ${complaintId} not found or error:`, complaintError?.message);
+        return { success: false, error: 'Complaint not found' };
+      }
+
+      // Fetch the RTI PDF document
+      const { data: documents, error: docError } = await supabase
+        .from('complaint_documents')
+        .select('id, document_type, file_name, storage_path, public_url, created_at')
+        .eq('complaint_id', complaintId)
+        .eq('document_type', 'rti_pdf')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (docError) {
+        logger.error('Error fetching RTI PDF:', docError.message);
+        return { success: false, error: 'Failed to fetch RTI PDF' };
+      }
+
+      if (!documents || documents.length === 0) {
+        logger.warn(`No RTI PDF found for complaint ${complaintId}`);
+        return { success: false, error: 'RTI PDF not found for this complaint' };
+      }
+
+      const rtiPdf = documents[0];
+      logger.info(`RTI PDF retrieved for complaint ${complaintId}: ${rtiPdf.file_name}`);
+
+      return {
+        success: true,
+        documentId: rtiPdf.id,
+        fileName: rtiPdf.file_name,
+        pdfUrl: rtiPdf.public_url,
+        storagePath: rtiPdf.storage_path,
+        createdAt: rtiPdf.created_at
+      };
+    } catch (error) {
+      logger.error('Get RTI PDF error:', error);
+      return { success: false, error: 'Failed to retrieve RTI PDF' };
     }
   },
 };
