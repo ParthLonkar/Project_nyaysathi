@@ -143,13 +143,13 @@ export const staffController = {
     try {
       const { complaintId } = req.params;
       const { noteText } = req.body;
-      const { staff_name } = req.user;
+      const { id: staffId, staff_name } = req.user;
 
       if (!complaintId || !noteText) {
         return res.status(400).json({ error: 'Complaint ID and note text required' });
       }
 
-      const result = await staffService.addComplaintNote(complaintId, noteText, staff_name);
+      const result = await staffService.addComplaintNote(complaintId, noteText, staff_name, staffId);
 
       if (!result.success) {
         return res.status(500).json(result);
@@ -244,6 +244,44 @@ export const staffController = {
     } catch (error) {
       logger.error('Get dashboard error:', error);
       return res.status(500).json({ error: 'Failed to get dashboard' });
+    }
+  },
+
+  /**
+   * Upload evidence file for complaint work progress
+   * POST /staff/complaints/:complaintId/upload-evidence
+   * FormData: { file, fileType? }
+   */
+  uploadEvidenceFile: async (req, res) => {
+    try {
+      const { complaintId } = req.params;
+      const { id: staffId } = req.user;
+      const { fileType = 'evidence' } = req.body;
+
+      if (!complaintId) {
+        return res.status(400).json({ error: 'Complaint ID required' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file provided' });
+      }
+
+      const result = await staffService.uploadEvidenceFile(
+        complaintId,
+        req.file.buffer,
+        req.file.originalname,
+        fileType,
+        staffId
+      );
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+
+      return res.status(201).json(result);
+    } catch (error) {
+      logger.error('Upload evidence error:', error);
+      return res.status(500).json({ error: 'Failed to upload evidence' });
     }
   }
 };

@@ -172,8 +172,7 @@ export const staffService = {
       const { data, error } = await supabase
         .from('complaints')
         .update({
-          status: newStatus,
-          updated_at: new Date().toISOString()
+          status: newStatus
         })
         .eq('id', complaintId)
         .select()
@@ -200,8 +199,7 @@ export const staffService = {
       const { data, error } = await supabase
         .from('complaints')
         .update({
-          progress_percentage: progressPercentage,
-          updated_at: new Date().toISOString()
+          progress_percentage: progressPercentage
         })
         .eq('id', complaintId)
         .select()
@@ -222,12 +220,13 @@ export const staffService = {
   /**
    * Add note to complaint
    */
-  addComplaintNote: async (complaintId, noteText, staffName) => {
+  addComplaintNote: async (complaintId, noteText, staffName, staffId) => {
     try {
       const { data, error } = await supabase
         .from('complaint_notes')
         .insert({
           complaint_id: complaintId,
+          staff_id: staffId,
           note_text: noteText,
           created_by_name: staffName,
           created_at: new Date().toISOString()
@@ -361,6 +360,67 @@ export const staffService = {
     } catch (error) {
       logger.error('Get dashboard error:', error);
       return { success: false, error: 'Failed to get dashboard' };
+    }
+  },
+
+  /**
+   * Upload evidence file for complaint work progress
+   */
+  uploadEvidenceFile: async (complaintId, fileBuffer, fileName, fileType = 'evidence', staffId = null) => {
+    try {
+      // Generate unique file path
+      const timestamp = Date.now();
+      const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const storagePath = `complaints/${complaintId}/evidence/${timestamp}-${safeFileName}`;
+
+      // Upload to Supabase storage
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from('complaint-documents')
+        .upload(storagePath, fileBuffer);
+
+      if (uploadError) {
+        logger.error('File upload error:', uploadError);
+        return { success: false, error: 'Failed to upload file' };
+      }
+
+      // Get public URL
+      const { data: publicUrlData } = supabase
+        .storage
+        .from('complaint-documents')
+        .getPublicUrl(storagePath);
+
+      // Create complaint_documents record using admin client to bypass RLS
+      const writeClient = supabaseAdmin || supabase;
+      const docPayload = {
+        complaint_id: complaintId,
+        document_type: fileType,
+        file_name: fileName,
+        storage_path: storagePath,
+        public_url: publicUrlData.publicUrl
+      };
+      
+      // Include staff_id if provided (for tracking)
+      if (staffId) {
+        docPayload.staff_id = staffId;
+      }
+
+      const { data: docRecord, error: dbError } = await writeClient
+        .from('complaint_documents')
+        .insert(docPayload)
+        .select()
+        .single();
+
+      if (dbError) {
+        logger.error('Create document record error:', dbError);
+        return { success: false, error: 'Failed to save document record' };
+      }
+
+      logger.info(`Evidence file uploaded for complaint ${complaintId}: ${fileName}`);
+      return { success: true, document: docRecord };
+    } catch (error) {
+      logger.error('Upload evidence error:', error);
+      return { success: false, error: 'Failed to upload evidence' };
     }
   }
 };
