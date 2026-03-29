@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Search } from 'lucide-react';
+import SolvedCasesMapSection from '../components/SolvedCasesMapSection';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -137,6 +138,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <SolvedCasesMapSection />
 
       {/* Trust Indicators */}
       <section className="bg-gray-100 py-16">

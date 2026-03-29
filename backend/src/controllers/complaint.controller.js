@@ -29,6 +29,30 @@ const parseMetadataAttachments = (attachmentsMeta) => {
   return [];
 };
 
+const parseLocationCoordinates = (locationCoordinates) => {
+  if (!locationCoordinates) return null;
+
+  let parsed = locationCoordinates;
+  if (typeof locationCoordinates === 'string') {
+    try {
+      parsed = JSON.parse(locationCoordinates);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  const lat = Number.parseFloat(parsed?.lat);
+  const lng = Number.parseFloat(parsed?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  return {
+    lat,
+    lng,
+    source: parsed?.source || null,
+    captured_at: parsed?.captured_at || null,
+  };
+};
+
 const deriveProgressFromStatus = (status = 'new') => {
   const key = String(status || 'new').toLowerCase();
   const map = {
@@ -119,6 +143,7 @@ export const complaintController = {
         description,
         complaint_text,
         location,
+        location_coordinates,
         userId,
         name,
         phone,
@@ -127,6 +152,7 @@ export const complaintController = {
       } = req.body || {};
 
       const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+      const resolvedLocationCoordinates = parseLocationCoordinates(location_coordinates);
       const metadataAttachments = parseMetadataAttachments(attachment_meta || attachments);
       const resolvedDescription = description || complaint_text || '';
       const resolvedTitle = buildResolvedTitle(title, resolvedDescription);
@@ -336,6 +362,7 @@ export const complaintController = {
           input: {
             text: resolvedDescription,
             location,
+            location_coordinates: resolvedLocationCoordinates,
             citizen_name: name || null,
             citizen_phone: phone || null,
             attachments: metadataAttachments,
@@ -463,7 +490,44 @@ export const complaintController = {
       next(error);
     }
   },
+  getPublicSolvedMapData: async (req, res, next) => {
+    try {
+      const requestedLimit = Number.parseInt(req.query.limit, 10);
+      const safeLimit = Number.isFinite(requestedLimit)
+        ? Math.max(50, Math.min(requestedLimit, 2000))
+        : 800;
 
+      const { data, error } = await supabaseAdmin
+        .from('complaints')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(safeLimit);
+
+      if (error) throw error;
+
+      const complaints = (Array.isArray(data) ? data : []).map((item) => ({
+        id: item.id,
+        title: item.title || null,
+        description: item.description || null,
+        status: item.status || null,
+        location: item.location || item?.ai_analysis?.input?.location || null,
+        location_coordinates: item.location_coordinates || item?.ai_analysis?.input?.location_coordinates || null,
+        department: item.department
+          || item?.routing_info?.departmentName
+          || item?.routing_info?.department_name
+          || item?.ai_analysis?.department
+          || null,
+        closed_at: item.closed_at || item.resolved_at || item.updated_at || item.submitted_at || item.created_at || null,
+        updated_at: item.updated_at || null,
+        submitted_at: item.submitted_at || null,
+        created_at: item.created_at || null,
+      }));
+
+      res.json({ complaints });
+    } catch (error) {
+      next(error);
+    }
+  },
   getComplaintById: async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -610,5 +674,7 @@ export const complaintController = {
     }
   },
 };
+
+
 
 

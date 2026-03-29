@@ -12,6 +12,7 @@ export const complaintService = {
       title: formData.title || generatedTitle || 'Civic complaint',
       description: formData.description || complaintText,
       location: formData.location,
+      location_coordinates: formData.location_coordinates || null,
       userId: formData.userId || 'demo-user',
       name: formData.name || formData.fullName || '',
       phone: formData.phone || '',
@@ -29,6 +30,7 @@ export const complaintService = {
       multipart.append('title', payload.title);
       multipart.append('description', payload.description);
       multipart.append('location', payload.location);
+      multipart.append('location_coordinates', JSON.stringify(payload.location_coordinates));
       multipart.append('userId', payload.userId);
       multipart.append('name', payload.name);
       multipart.append('phone', payload.phone);
@@ -58,6 +60,11 @@ export const complaintService = {
     return response.data;
   },
 
+  getPublicSolvedCasesMapData: async (limit = 800) => {
+    const response = await api.get('/complaints/public/solved-map', { params: { limit } });
+    return response.data;
+  },
+
   getComplaintById: async (id) => {
     const response = await api.get(`/complaints/${id}`);
     return response.data;
@@ -73,3 +80,4 @@ export const complaintService = {
     return response.data;
   },
 };
+

@@ -5,12 +5,19 @@ import StarterChips from './intake/StarterChips';
 import VoiceInputButton from './intake/VoiceInputButton';
 import AttachmentUploader from './intake/AttachmentUploader';
 
+const toNumber = (value) => {
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) ? n : null;
+};
+
 export default function ComplaintForm() {
   const navigate = useNavigate();
   const [complaintText, setComplaintText] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const [locationCoordinates, setLocationCoordinates] = useState(null);
+  const [locating, setLocating] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,6 +31,67 @@ export default function ComplaintForm() {
     setComplaintText((prev) => (prev ? `${prev} ${text}` : text));
   };
 
+  const setCoordinates = (lat, lng, source = 'address') => {
+    const latitude = toNumber(lat);
+    const longitude = toNumber(lng);
+    if (latitude === null || longitude === null) return null;
+
+    const coords = {
+      lat: Number(latitude.toFixed(7)),
+      lng: Number(longitude.toFixed(7)),
+      source,
+      captured_at: new Date().toISOString(),
+    };
+
+    setLocationCoordinates(coords);
+    return coords;
+  };
+
+  const geocodeAddress = async (address) => {
+    const query = String(address || '').trim();
+    if (!query) return null;
+
+    const scopedQuery = /nagpur/i.test(query) ? query : `${query}, Nagpur, Maharashtra, India`;
+    const endpoint = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(scopedQuery)}`;
+
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      throw new Error('Could not geocode address');
+    }
+
+    const results = await response.json();
+    if (!Array.isArray(results) || results.length === 0) {
+      return null;
+    }
+
+    return setCoordinates(results[0].lat, results[0].lon, 'address_geocoded');
+  };
+
+  const handleUseCurrentLocation = () => {
+    setError('');
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported in this browser.');
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCoordinates(position.coords.latitude, position.coords.longitude, 'device_gps');
+        setLocating(false);
+      },
+      (geoError) => {
+        setError(`Unable to fetch device location: ${geoError.message}`);
+        setLocating(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 0,
+      },
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -33,17 +101,29 @@ export default function ComplaintForm() {
       return;
     }
     if (!location.trim()) {
-      setError('Please add your area/location.');
+      setError('Please add your exact location/address.');
       return;
     }
 
     setLoading(true);
     try {
+      let resolvedCoordinates = locationCoordinates;
+      if (!resolvedCoordinates) {
+        resolvedCoordinates = await geocodeAddress(location);
+      }
+
+      if (!resolvedCoordinates) {
+        setError('Exact location coordinates were not resolved. Please provide a precise address or use current location.');
+        setLoading(false);
+        return;
+      }
+
       const response = await complaintService.submitComplaint({
         complaintText,
         name,
         phone,
         location,
+        location_coordinates: resolvedCoordinates,
         attachments,
       });
 
@@ -58,6 +138,7 @@ export default function ComplaintForm() {
             name,
             phone,
             location,
+            locationCoordinates: resolvedCoordinates,
             attachments,
             aiResult: response?.aiResult || null,
             rawComplaint: response?.complaint || null,
@@ -147,15 +228,31 @@ export default function ComplaintForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Location / Area</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Exact Location / Address</label>
                 <input
                   type="text"
                   value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Sector, ward, locality"
+                  onChange={(e) => {
+                    setLocation(e.target.value);
+                    setLocationCoordinates(null);
+                  }}
+                  placeholder="House/Street/Locality, Nagpur"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={loading || locating}
+                  className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-900 disabled:opacity-50"
+                >
+                  {locating ? 'Capturing location...' : 'Use Current GPS Location'}
+                </button>
+                {locationCoordinates && (
+                  <p className="mt-1 text-xs text-emerald-700 font-semibold">
+                    Coordinates captured: {locationCoordinates.lat}, {locationCoordinates.lng}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -203,3 +300,4 @@ export default function ComplaintForm() {
     </div>
   );
 }
+
