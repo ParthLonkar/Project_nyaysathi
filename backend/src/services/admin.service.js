@@ -215,7 +215,10 @@ export const adminService = {
 
   getDepartmentStaff: async (departmentId) => {
     try {
-      const { data: staff, error } = await supabase
+      logger.info(`Fetching staff for department: ${departmentId}`);
+      
+      // First try to fetch staff by department_id
+      let { data: staff, error } = await supabase
         .from('department_staff')
         .select(`
           id,
@@ -223,6 +226,7 @@ export const adminService = {
           email,
           phone,
           position,
+          department_id,
           is_active,
           complaints_assigned,
           complaints_resolved,
@@ -239,6 +243,42 @@ export const adminService = {
       if (error) {
         logger.error('Get staff error:', error);
         return { success: false, error: 'Failed to fetch staff' };
+      }
+
+      // If no staff found for department_id, fetch all active staff (fallback)
+      if (!staff || staff.length === 0) {
+        logger.warn(`No staff found for department ${departmentId}, fetching all active staff as fallback`);
+        const { data: allStaff, error: allStaffError } = await supabase
+          .from('department_staff')
+          .select(`
+            id,
+            staff_name,
+            email,
+            phone,
+            position,
+            department_id,
+            is_active,
+            complaints_assigned,
+            complaints_resolved,
+            average_resolution_days,
+            staff_performance (
+              customer_satisfaction_score,
+              sla_achievement_rate,
+              on_time_completion_rate
+            )
+          `)
+          .eq('is_active', true)
+          .order('staff_name', { ascending: true });
+
+        if (allStaffError) {
+          logger.error('Get all staff error:', allStaffError);
+          return { success: false, error: 'Failed to fetch staff' };
+        }
+        
+        staff = allStaff;
+        logger.info(`Fetched ${staff?.length || 0} active staff members as fallback`);
+      } else {
+        logger.info(`Fetched ${staff?.length || 0} staff members for department ${departmentId}`);
       }
 
       return { success: true, staff };

@@ -81,8 +81,14 @@ export default function AdminDashboard() {
         credentials: 'include'
       });
       if (staffRes.ok) {
-        const { staff: data } = await staffRes.json();
-        setStaff(data || []);
+        const response = await staffRes.json();
+        console.log('Staff API response:', response);
+        const staffData = response.staff || response.data || [];
+        console.log('Processed staff data:', staffData);
+        setStaff(staffData);
+      } else {
+        console.error('Failed to fetch staff:', staffRes.status, await staffRes.text());
+        setStaff([]);
       }
 
       // Fetch dashboard summary
@@ -204,7 +210,8 @@ export default function AdminDashboard() {
 
   const getStatusColor = (status) => {
     switch(status) {
-      case 'assigned': return 'bg-secondary-container/20 text-secondary';
+      case 'assigned': return 'bg-green-100/80 text-green-700';
+      case 'new': return 'bg-red-100/80 text-red-700';
       case 'in_progress': return 'bg-secondary-container/20 text-secondary';
       case 'resolved': return 'bg-tertiary/10 text-tertiary';
       case 'routed': return 'bg-primary/10 text-primary';
@@ -592,11 +599,6 @@ export default function AdminDashboard() {
                 <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <h3 className="text-xl font-headline font-extrabold text-primary">Active Complaints</h3>
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex border border-slate-200 rounded-lg p-1 bg-slate-50">
-                      <button className="px-3 py-1.5 text-xs font-bold bg-white shadow-sm rounded-md text-primary">All</button>
-                      <button className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-primary transition-colors">Urgent</button>
-                      <button className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-primary transition-colors">New</button>
-                    </div>
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
@@ -613,51 +615,57 @@ export default function AdminDashboard() {
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-50/50 border-b border-slate-100">
+                    <thead className="bg-gradient-to-r from-slate-50 to-slate-100/50 border-b-2 border-slate-200">
                       <tr>
-                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <th className="px-6 py-5">
                           <input type="checkbox" className="rounded text-primary focus:ring-primary w-4 h-4" />
                         </th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Title</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Category</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Priority</th>
-                        <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+                        <th className="px-6 py-5 text-[11px] font-bold text-slate-600 uppercase tracking-widest">Title</th>
+                        <th className="px-6 py-5 text-[11px] font-bold text-slate-600 uppercase tracking-widest">Category</th>
+                        <th className="px-6 py-5 text-[11px] font-bold text-slate-600 uppercase tracking-widest">Status</th>
+                        <th className="px-6 py-5 text-[11px] font-bold text-slate-600 uppercase tracking-widest">Priority</th>
+                        <th className="px-6 py-5 text-[11px] font-bold text-slate-600 uppercase tracking-widest text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredComplaints.map((complaint) => (
-                        <tr key={complaint.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => {
+                      {filteredComplaints.map((complaint, idx) => (
+                        <tr key={complaint.id} className="hover:bg-primary/5 transition-all duration-200 cursor-pointer group" onClick={() => {
                           setSelectedComplaint(complaint);
                           setShowDetailView(true);
                         }}>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-5">
                             <input type="checkbox" className="rounded text-primary focus:ring-primary w-4 h-4" onClick={(e) => e.stopPropagation()} />
                           </td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-bold text-on-surface">{complaint.title}</p>
-                            <p className="text-xs text-slate-500">{complaint.reference_id}</p>
+                          <td className="px-6 py-5">
+                            <p className="text-sm font-bold text-on-surface group-hover:text-primary transition-colors">{complaint.title}</p>
+                            <p className="text-xs text-slate-500 font-mono">{complaint.reference_id}</p>
                           </td>
-                          <td className="px-6 py-4 text-xs text-slate-600">{complaint.category}</td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${getStatusColor(complaint.status)} italic`}>
-                              {complaint.status}
+                          <td className="px-6 py-5">
+                            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold">
+                              <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                              {complaint.category}
                             </span>
                           </td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-black uppercase ${getPriorityColor(complaint.priority)}`}>
+                          <td className="px-6 py-5">
+                            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold ${getStatusColor(complaint.status)} shadow-sm`}>
+                              {complaint.status === 'new' ? 'unassigned' : complaint.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5">
+                            <span className={`inline-flex items-center px-3 py-1.5 rounded-lg text-[11px] font-black uppercase ${getPriorityColor(complaint.priority)} shadow-sm`}>
                               {complaint.priority}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-sm" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
                             {!complaint.assigned_staff_id && (
                               <button
                                 onClick={() => {
                                   setSelectedComplaint(complaint);
                                   setShowAssignModal(true);
                                 }}
-                                className="text-primary hover:text-primary-container font-semibold transition-colors"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-primary-container hover:shadow-lg transition-all duration-200 active:scale-95"
                               >
+                                <span>+</span>
                                 Assign
                               </button>
                             )}
@@ -668,14 +676,14 @@ export default function AdminDashboard() {
                   </table>
                 </div>
 
-                <div className="p-6 bg-slate-50/50 border-t border-slate-50 flex items-center justify-between">
-                  <p className="text-xs font-medium text-slate-500">Showing 1-{filteredComplaints.length} of {complaints.length} complaints</p>
+                <div className="p-6 bg-gradient-to-r from-slate-50 to-slate-100/50 border-t-2 border-slate-200 flex items-center justify-between">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-widest">Showing 1-{filteredComplaints.length} of {complaints.length} complaints</p>
                   <div className="flex items-center space-x-2">
-                    <button className="w-8 h-8 flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 transition-colors">
+                    <button className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-300 bg-white hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 shadow-sm">
                       <span className="material-symbols-outlined text-sm">chevron_left</span>
                     </button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded bg-primary text-white text-xs font-bold">1</button>
-                    <button className="w-8 h-8 flex items-center justify-center rounded border border-slate-200 bg-white hover:bg-slate-50 transition-colors">
+                    <button className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary text-white text-xs font-bold shadow-md hover:shadow-lg transition-all duration-200">1</button>
+                    <button className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-300 bg-white hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 shadow-sm">
                       <span className="material-symbols-outlined text-sm">chevron_right</span>
                     </button>
                   </div>
@@ -797,16 +805,20 @@ export default function AdminDashboard() {
                 <p className="text-slate-600 mb-6 text-sm">{selectedComplaint.title}</p>
 
                 <div className="space-y-2 mb-6 max-h-64 overflow-y-auto">
-                  {staff.filter(s => s.is_active).map(member => (
-                    <button
-                      key={member.id}
-                      onClick={() => handleAssignComplaint(member.id)}
-                      className="w-full text-left p-4 hover:bg-primary/5 border border-slate-200 rounded-lg transition-colors"
-                    >
-                      <p className="font-semibold text-on-surface">{member.staff_name}</p>
-                      <p className="text-sm text-slate-600">{member.position}</p>
-                    </button>
-                  ))}
+                  {staff && staff.length > 0 ? (
+                    staff.map(member => (
+                      <button
+                        key={member.id}
+                        onClick={() => handleAssignComplaint(member.id)}
+                        className="w-full text-left p-4 hover:bg-primary/5 border border-slate-200 rounded-lg transition-colors"
+                      >
+                        <p className="font-semibold text-on-surface">{member.staff_name}</p>
+                        <p className="text-sm text-slate-600">{member.position}</p>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="text-slate-500 text-center py-8">No staff members available</p>
+                  )}
                 </div>
 
                 <button
@@ -850,8 +862,8 @@ export default function AdminDashboard() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Status</p>
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getStatusColor(selectedComplaint.status)} italic`}>
-                        {selectedComplaint.status}
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${getStatusColor(selectedComplaint.status)}`}>
+                        {selectedComplaint.status === 'new' ? 'unassigned' : selectedComplaint.status}
                       </span>
                     </div>
                     <div>
