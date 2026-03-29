@@ -149,7 +149,7 @@ export const adminService = {
         } else if (assignmentRows && assignmentRows.length > 0) {
           // Get unique staff IDs
           const staffIds = [...new Set(assignmentRows.map(a => a.staff_id).filter(Boolean))];
-          logger.info(`Found ${staffIds.length} unique staff IDs`);
+          logger.info(`Found ${staffIds.length} unique staff IDs from assignments:`, staffIds);
           
           // Fetch staff details
           if (staffIds.length > 0) {
@@ -179,6 +179,9 @@ export const adminService = {
                     email: staff.email,
                     assigned_at: assignment.assigned_at,
                   };
+                  logger.info(`Assigned complaint ${assignment.complaint_id} to staff ${staff.staff_name}`);
+                } else {
+                  logger.warn(`Staff ID ${assignment.staff_id} not found for assignment ${assignment.complaint_id}`);
                 }
               });
             }
@@ -188,12 +191,15 @@ export const adminService = {
         }
       }
 
-      const complaints = (data || []).map((complaint) => ({
-        ...complaint,
-        agent_details: extractAgentDetails(complaint),
-        documents: documentsByComplaint[complaint.id] || complaint?.ai_analysis?.documents || [],
-        staffAssignment: staffAssignmentsByComplaint[complaint.id] || { staff_name: 'Unassigned', position: '', email: '', assigned_at: null },
-      }));
+      const complaints = (data || []).map((complaint) => {
+        const assignment = staffAssignmentsByComplaint[complaint.id];
+        return {
+          ...complaint,
+          agent_details: extractAgentDetails(complaint),
+          documents: documentsByComplaint[complaint.id] || complaint?.ai_analysis?.documents || [],
+          staffAssignment: assignment || null,
+        };
+      });
 
       return { success: true, complaints };
     } catch (error) {
