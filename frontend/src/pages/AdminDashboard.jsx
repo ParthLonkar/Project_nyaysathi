@@ -885,12 +885,12 @@ export default function AdminDashboard() {
                   {/* Assigned Staff */}
                   <div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Assigned To</p>
-                    {selectedComplaint.staffAssignment?.staff_name && selectedComplaint.staffAssignment?.staff_name !== 'Unassigned' ? (
+                    {(selectedComplaint.staffAssignment?.staff_name && selectedComplaint.staffAssignment.staff_name !== 'Unassigned') ? (
                       <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                         <p className="font-semibold text-on-surface">{selectedComplaint.staffAssignment.staff_name}</p>
-                        <p className="text-sm text-slate-600">{selectedComplaint.staffAssignment.position}</p>
+                        <p className="text-sm text-slate-600">{selectedComplaint.staffAssignment.position || 'N/A'}</p>
                       </div>
-                    ) : selectedComplaint.department_staff ? (
+                    ) : selectedComplaint.department_staff?.staff_name ? (
                       <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                         <p className="font-semibold text-on-surface">{selectedComplaint.department_staff.staff_name}</p>
                         <p className="text-sm text-slate-600">{selectedComplaint.department_staff.position}</p>

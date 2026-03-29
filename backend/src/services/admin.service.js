@@ -172,12 +172,14 @@ export const adminService = {
               // Map assignments to complaints
               assignmentRows.forEach((assignment) => {
                 const staff = staffLookup[assignment.staff_id];
-                staffAssignmentsByComplaint[assignment.complaint_id] = {
-                  staff_name: staff?.staff_name || 'Unassigned',
-                  position: staff?.position || '',
-                  email: staff?.email || '',
-                  assigned_at: assignment.assigned_at,
-                };
+                if (staff) {
+                  staffAssignmentsByComplaint[assignment.complaint_id] = {
+                    staff_name: staff.staff_name,
+                    position: staff.position,
+                    email: staff.email,
+                    assigned_at: assignment.assigned_at,
+                  };
+                }
               });
             }
           }
