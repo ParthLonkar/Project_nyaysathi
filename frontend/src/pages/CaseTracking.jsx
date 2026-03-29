@@ -31,6 +31,40 @@ const getStatusStyles = (status = '') => {
   return map[key] || 'bg-gray-100 text-gray-800';
 };
 
+const PipelineStages = [
+  {
+    icon: 'input',
+    title: 'Intake',
+    description: 'System validates documents and categorizes the legal domain of your complaint.',
+  },
+  {
+    icon: 'psychology',
+    title: 'AI Assessment',
+    description: 'Neural engines extract core facts and identify potential legal violations instantly.',
+  },
+  {
+    icon: 'analytics',
+    title: 'Legal Analysis',
+    description: 'Comparison against 100k+ precedents to determine the strength of your case.',
+  },
+  {
+    icon: 'description',
+    title: 'Doc Generation',
+    description: 'Automated drafting of petitions and formal notices in professional legal format.',
+  },
+  {
+    icon: 'verified_user',
+    title: 'Compliance',
+    description: 'Final check against current procedural codes and judicial standards.',
+  },
+  {
+    icon: 'task_alt',
+    title: 'Resolution',
+    description: 'Filing submission completed or case-ready package delivered to user.',
+    filled: true,
+  },
+];
+
 export default function CaseTracking() {
   const { complaintId } = useParams();
   const navigate = useNavigate();
@@ -83,127 +117,264 @@ export default function CaseTracking() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8">
-            <p className="inline-flex px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-bold uppercase tracking-wide mb-3">
-              Citizen Tracking
+      <main className="bg-surface min-h-screen">
+        {/* Hero Section */}
+        <section className="relative px-8 pt-24 pb-32 overflow-hidden">
+          <div className="max-w-5xl mx-auto text-center relative z-10">
+            <h1 className="font-headline text-5xl md:text-6xl font-extrabold text-primary mb-6 tracking-tight">
+              Track Your Complaint Journey
+            </h1>
+            <p className="text-lg md:text-xl text-on-surface-variant max-w-2xl mx-auto leading-relaxed font-body">
+              Monitor your AI-driven legal processing with absolute clarity. Transparency at every step, from initial intake to final resolution.
             </p>
-            <h1 className="text-3xl md:text-4xl font-black text-blue-900">Track Complaint by Reference ID</h1>
-            <p className="text-gray-600 mt-3">Enter your reference ID to check live complaint progress and latest updates.</p>
           </div>
+          {/* Decorative blur */}
+          <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-secondary/5 rounded-full blur-3xl"></div>
+        </section>
 
-          <form onSubmit={onSubmit} className="bg-white border border-gray-200 rounded-2xl p-5 md:p-6 shadow-sm mb-6">
-            <label htmlFor="referenceId" className="block text-sm font-bold text-gray-800 mb-2">
-              Reference ID
-            </label>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                id="referenceId"
-                value={referenceIdInput}
-                onChange={(e) => setReferenceIdInput(e.target.value)}
-                placeholder="Ref-2026-123456"
-                className="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
-              />
+        {/* Search Block */}
+        <section className="px-8 -mt-20 relative z-20 mb-32">
+          <div className="max-w-3xl mx-auto">
+            <form onSubmit={onSubmit} className="bg-surface-container-lowest p-6 md:p-8 rounded-xl shadow-2xl shadow-primary/5 flex flex-col md:flex-row gap-4">
+              <div className="flex-grow relative">
+                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">search</span>
+                <input
+                  value={referenceIdInput}
+                  onChange={(e) => setReferenceIdInput(e.target.value)}
+                  placeholder="Enter Reference ID (e.g. Ref-2026-123456)"
+                  className="w-full pl-12 pr-4 py-4 bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all text-on-surface font-body"
+                  type="text"
+                />
+              </div>
               <button
                 type="submit"
                 disabled={loading}
-                className="rounded-xl bg-blue-700 text-white font-bold px-6 py-3 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-8 py-4 rounded-lg font-headline font-bold hover:shadow-lg active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {loading ? 'Tracking...' : 'Track'}
+                {loading ? 'Tracking...' : 'Track Status'}
               </button>
-            </div>
-          </form>
+            </form>
+          </div>
+        </section>
 
-          {error && (
-            <div className="mb-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3">
-              <p className="text-red-700 font-semibold">{error}</p>
+        {error && (
+          <div className="px-8 mb-8 max-w-3xl mx-auto">
+            <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3">
+              <p className="text-red-700 font-semibold text-sm">{error}</p>
             </div>
-          )}
+          </div>
+        )}
 
-          {!loading && !trackedComplaint && !error && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
-              Enter your reference ID above to view your complaint status.
-            </div>
-          )}
+        {!trackedComplaint && !loading && (
+          <>
+            {/* Pipeline Section */}
+            <section className="px-8 mt-24 mb-32 max-w-7xl mx-auto">
+              <div className="mb-16">
+                <h2 className="font-headline text-3xl font-bold text-on-surface mb-4">The NyaySathi Pipeline</h2>
+                <p className="text-on-surface-variant font-body">Understand how our proprietary AI analyzes and processes your legal documents.</p>
+              </div>
 
-          {trackedComplaint && (
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 relative">
+                {/* Connector Line (Desktop) */}
+                <div className="hidden lg:block absolute top-12 left-0 w-full h-0.5 bg-outline-variant/30 z-0"></div>
+
+                {PipelineStages.map((stage, index) => (
+                  <div key={index} className="relative z-10 group">
+                    <div className="bg-surface-container-low p-6 rounded-xl group-hover:bg-white group-hover:shadow-xl transition-all duration-300 h-full border-t-4 border-primary/20 group-hover:border-primary">
+                      <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center mb-4 shadow-sm">
+                        <span 
+                          className="material-symbols-outlined text-primary"
+                          style={stage.filled ? { fontVariationSettings: "'FILL' 1" } : {}}
+                        >
+                          {stage.icon}
+                        </span>
+                      </div>
+                      <h3 className="font-headline font-bold text-primary text-sm mb-2">{stage.title}</h3>
+                      <p className="text-xs text-on-surface-variant leading-relaxed">{stage.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Trust & Security Section */}
+            <section className="px-8 bg-surface-container-low py-24">
+              <div className="max-w-7xl mx-auto">
+                <div className="text-center mb-16">
+                  <h2 className="font-headline text-3xl font-bold text-on-surface mb-4">Built on Trust and Precision</h2>
+                  <p className="text-on-surface-variant font-body">Our platform operates under strict ethical AI guidelines and legal protocols.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+                  {/* Card 1 */}
+                  <div className="bg-surface-container-lowest p-8 rounded-xl shadow-sm border border-outline-variant/10">
+                    <div className="w-14 h-14 rounded-full bg-secondary-container flex items-center justify-center mb-6">
+                      <span className="material-symbols-outlined text-secondary">update</span>
+                    </div>
+                    <h4 className="font-headline font-bold text-xl mb-3 text-on-surface">Real-time Updates</h4>
+                    <p className="text-on-surface-variant font-body leading-relaxed text-sm">
+                      No more waiting in the dark. Receive instant notifications via SMS or email the second our AI completes a processing phase.
+                    </p>
+                  </div>
+
+                  {/* Card 2 */}
+                  <div className="bg-surface-container-lowest p-8 rounded-xl shadow-sm border border-outline-variant/10">
+                    <div className="w-14 h-14 rounded-full bg-secondary-container flex items-center justify-center mb-6">
+                      <span className="material-symbols-outlined text-secondary">visibility</span>
+                    </div>
+                    <h4 className="font-headline font-bold text-xl mb-3 text-on-surface">AI Transparency</h4>
+                    <p className="text-on-surface-variant font-body leading-relaxed text-sm">
+                      We provide "Explainable AI" logs. Click on any stage to see the specific legal reasoning and data points the system utilized.
+                    </p>
+                  </div>
+
+                  {/* Card 3 */}
+                  <div className="bg-surface-container-lowest p-8 rounded-xl shadow-sm border border-outline-variant/10">
+                    <div className="w-14 h-14 rounded-full bg-secondary-container flex items-center justify-center mb-6">
+                      <span className="material-symbols-outlined text-secondary">gavel</span>
+                    </div>
+                    <h4 className="font-headline font-bold text-xl mb-3 text-on-surface">Judicial Compliance</h4>
+                    <p className="text-on-surface-variant font-body leading-relaxed text-sm">
+                      Every byte of data is processed in alignment with the High Court Digital Guidelines and Data Privacy Acts.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Trust Badges */}
+                <div className="flex flex-wrap items-center justify-center gap-12 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-3xl">enhanced_encryption</span>
+                    <span className="font-headline font-bold text-sm tracking-widest uppercase">End-to-End Encryption</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-3xl">workspace_premium</span>
+                    <span className="font-headline font-bold text-sm tracking-widest uppercase">ISO Certified AI</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-3xl">policy</span>
+                    <span className="font-headline font-bold text-sm tracking-widest uppercase">Legal Standards Verified</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {trackedComplaint && (
+          <section className="px-8 max-w-7xl mx-auto pb-32">
             <div className="space-y-6">
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+              {/* Complaint Details Card */}
+              <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-lg p-6 shadow-sm">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-                  <p className="text-sm text-gray-600">Reference ID</p>
-                  <p className="font-mono font-bold text-blue-900 bg-blue-50 px-3 py-1 rounded-lg break-all">
+                  <p className="text-sm text-on-surface-variant font-semibold">Reference ID</p>
+                  <p className="font-mono font-bold text-primary bg-primary-fixed px-3 py-1 rounded text-sm break-all">
                     {trackedComplaint.reference_id}
                   </p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-1">Status</p>
-                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${getStatusStyles(trackedComplaint.status)}`}>
+                    <p className="text-[10px] uppercase tracking-wide text-on-surface-variant font-semibold mb-0.5">Status</p>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold ${getStatusStyles(trackedComplaint.status)}`}>
                       {String(trackedComplaint.status || 'new').replace('_', ' ')}
                     </span>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-1">Category</p>
-                    <p className="font-semibold text-gray-900">{trackedComplaint.category || 'general'}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-on-surface-variant font-semibold mb-0.5">Category</p>
+                    <p className="font-semibold text-on-surface text-sm">{trackedComplaint.category || 'general'}</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-1">Priority</p>
-                    <p className="font-semibold text-gray-900">{trackedComplaint.priority || 'medium'}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-on-surface-variant font-semibold mb-0.5">Priority</p>
+                    <p className="font-semibold text-on-surface text-sm">{trackedComplaint.priority || 'medium'}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-                <h2 className="text-lg font-black text-gray-900 mb-3">Progress</h2>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              {/* Progress Card */}
+              <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-lg p-6 shadow-sm">
+                <h3 className="text-base font-bold text-on-surface mb-3">Progress</h3>
+                <div className="w-full bg-outline-variant/20 rounded-full h-2 overflow-hidden mb-2">
                   <div
-                    className="h-3 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full transition-all duration-500"
+                    className="h-2 bg-gradient-to-r from-primary to-secondary rounded-full transition-all duration-500"
                     style={{ width: `${Math.max(0, Math.min(100, Number(trackedComplaint.progress_percentage || 0)))}%` }}
                   />
                 </div>
-                <p className="text-sm text-gray-700 mt-2 font-semibold">
+                <p className="text-xs text-on-surface-variant font-semibold">
                   {Math.max(0, Math.min(100, Number(trackedComplaint.progress_percentage || 0)))}% complete
                 </p>
-                <div className="mt-4 grid md:grid-cols-2 gap-3 text-sm">
-                  <p><span className="font-semibold text-gray-700">Department:</span> {trackedComplaint.department || 'Pending routing'}</p>
-                  <p><span className="font-semibold text-gray-700">Submitted:</span> {safeDate(trackedComplaint.submitted_at || trackedComplaint.created_at)}</p>
-                  <p><span className="font-semibold text-gray-700">Last Update:</span> {safeDate(trackedComplaint.latest_update)}</p>
-                  <p><span className="font-semibold text-gray-700">Created:</span> {safeDate(trackedComplaint.created_at)}</p>
+
+                <div className="mt-4 grid md:grid-cols-2 gap-2 text-xs">
+                  <p><span className="font-semibold text-on-surface">Department:</span> {trackedComplaint.department || 'Pending routing'}</p>
+                  <p><span className="font-semibold text-on-surface">Submitted:</span> {safeDate(trackedComplaint.submitted_at || trackedComplaint.created_at)}</p>
+                  <p><span className="font-semibold text-on-surface">Last Update:</span> {safeDate(trackedComplaint.latest_update)}</p>
+                  <p><span className="font-semibold text-on-surface">Created:</span> {safeDate(trackedComplaint.created_at)}</p>
                 </div>
-                <p className="mt-4 text-sm text-gray-800">
-                  <span className="font-semibold text-gray-700">Summary:</span> {trackedComplaint.summary || 'No summary available yet.'}
+
+                <p className="mt-4 text-xs text-on-surface">
+                  <span className="font-semibold">Summary:</span> {trackedComplaint.summary || 'No summary available yet.'}
                 </p>
                 {trackedComplaint.latest_note && (
-                  <p className="mt-2 text-sm text-gray-800">
-                    <span className="font-semibold text-gray-700">Latest Note:</span> {trackedComplaint.latest_note}
+                  <p className="mt-2 text-xs text-on-surface">
+                    <span className="font-semibold">Latest Note:</span> {trackedComplaint.latest_note}
                   </p>
                 )}
               </div>
 
-              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-                <h2 className="text-lg font-black text-gray-900 mb-4">Timeline</h2>
-                <div className="space-y-3">
+              {/* Timeline Card */}
+              <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-lg p-6 shadow-sm">
+                <h3 className="text-base font-bold text-on-surface mb-3">Timeline</h3>
+                <div className="space-y-2">
                   {timeline.map((entry, index) => (
-                    <div key={`${entry.status}-${entry.at || index}`} className="border border-gray-200 rounded-lg p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold text-gray-900 capitalize">{String(entry.status || 'updated').replace('_', ' ')}</p>
-                        <p className="text-xs text-gray-500">{safeDate(entry.at)}</p>
+                    <div key={`${entry.status}-${entry.at || index}`} className="border border-outline-variant/20 rounded-lg p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold text-on-surface capitalize text-sm">{String(entry.status || 'updated').replace('_', ' ')}</p>
+                        <p className="text-[10px] text-on-surface-variant">{safeDate(entry.at)}</p>
                       </div>
-                      <p className="text-sm text-gray-700 mt-1">{entry.note || 'Status updated.'}</p>
+                      <p className="text-xs text-on-surface-variant mt-1">{entry.note || 'Status updated.'}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {/* Documents Panel */}
               <GeneratedDocumentsPanel
                 documents={trackedComplaint.documents || []}
                 title="Download Documents"
               />
             </div>
-          )}
-        </div>
-      </div>
+          </section>
+        )}
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="fixed bottom-0 left-0 w-full flex md:hidden justify-around items-center px-4 py-3 bg-surface-container-lowest/90 backdrop-blur-md border-t border-outline-variant/20 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-40 rounded-t-2xl">
+          <button
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors"
+          >
+            <span className="material-symbols-outlined">home</span>
+            <span className="font-body text-[10px] uppercase tracking-widest font-bold">Home</span>
+          </button>
+          <button className="flex flex-col items-center justify-center text-primary scale-110">
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>track_changes</span>
+            <span className="font-body text-[10px] uppercase tracking-widest font-bold">Track</span>
+          </button>
+          <button
+            onClick={() => navigate('/admin')}
+            className="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors"
+          >
+            <span className="material-symbols-outlined">description</span>
+            <span className="font-body text-[10px] uppercase tracking-widest font-bold">Docs</span>
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-colors"
+          >
+            <span className="material-symbols-outlined">account_circle</span>
+            <span className="font-body text-[10px] uppercase tracking-widest font-bold">Profile</span>
+          </button>
+        </nav>
+      </main>
     </Layout>
   );
 }

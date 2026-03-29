@@ -323,6 +323,7 @@ export default function AdminDashboardNew() {
                     <th className="px-6 py-4">Complainant</th>
                     <th className="px-6 py-4">Subject Matter</th>
                     <th className="px-6 py-4">Filing Date</th>
+                    <th className="px-6 py-4">Assigned To</th>
                     <th className="px-6 py-4">Status</th>
                     <th className="px-8 py-4 text-right">Actions</th>
                   </tr>
@@ -356,6 +357,16 @@ export default function AdminDashboardNew() {
                       </td>
                       <td className="px-6 py-5 text-slate-600 dark:text-slate-400">
                         {new Date(complaint.created_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                            {complaint.staffAssignment?.staff_name?.charAt(0).toUpperCase() || '?'}
+                          </div>
+                          <span className="text-slate-900 dark:text-white font-medium">
+                            {complaint.staffAssignment?.staff_name || 'Unassigned'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-6 py-5">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(complaint.status)}`}>

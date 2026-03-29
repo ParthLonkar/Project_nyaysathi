@@ -52,10 +52,7 @@ export default function Navbar() {
             </>
           )}
           <button
-            onClick={() => {
-              const id = prompt('Enter your Complaint Reference ID:');
-              if (id) navigate(`/track/${encodeURIComponent(id.trim())}`);
-            }}
+            onClick={() => navigate('/track')}
             className="font-body font-medium text-on-surface hover:text-primary transition-colors text-sm bg-none border-none cursor-pointer p-0"
           >
             Track Complaint
@@ -117,8 +114,7 @@ export default function Navbar() {
           )}
           <button
             onClick={() => {
-              const id = prompt('Enter your Complaint Reference ID:');
-              if (id) navigate(`/track/${encodeURIComponent(id.trim())}`);
+              navigate('/track');
               setMobileOpen(false);
             }}
             className="block w-full text-left font-body font-medium text-on-surface hover:text-primary transition-colors text-sm bg-none border-none cursor-pointer p-2 rounded-lg hover:bg-surface-container"

@@ -835,7 +835,7 @@ export default function AdminDashboard() {
                   <div>
                     <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Complaint Details</p>
                     <h2 className="text-2xl font-headline font-bold text-on-surface">{selectedComplaint.title}</h2>
-                    <p className="text-sm text-slate-600 mt-2">{selectedComplaint.id}</p>
+                    <p className="text-sm text-slate-600 mt-2">{selectedComplaint.reference_id}</p>
                   </div>
                   <button
                     onClick={() => {

@@ -264,6 +264,25 @@ export const complaintController = {
         location,
       });
 
+      // Look up department_id from routing decision
+      let departmentId = null;
+      try {
+        const { data: deptData, error: deptError } = await supabaseAdmin
+          .from('departments')
+          .select('id')
+          .eq('code', routingDecision.departmentCode)
+          .single();
+
+        if (!deptError && deptData) {
+          departmentId = deptData.id;
+          logger.info(`Mapped department code ${routingDecision.departmentCode} to department_id ${departmentId}`);
+        } else if (deptError) {
+          logger.warn(`Failed to lookup department with code ${routingDecision.departmentCode}:`, deptError.message);
+        }
+      } catch (deptLookupError) {
+        logger.error(`Error looking up department:`, deptLookupError.message);
+      }
+
       const routingRecommendations = generateRoutingRecommendations({
         category: aiResult?.category || routingDecision.category || 'general',
         description: resolvedDescription,
@@ -335,6 +354,7 @@ export const complaintController = {
         admin_classification: actionPlan.admin_classification,
         manual_review: actionPlan.manual_review,
         ai_analysis: aiAuditPayload.ai_analysis,
+        ...(departmentId && { department_id: departmentId }), // Add department_id if available
       };
 
       let updatedComplaint = complaint;

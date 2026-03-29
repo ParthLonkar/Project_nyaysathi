@@ -82,10 +82,16 @@ export const adminService = {
   getDepartmentComplaints: async (_departmentId, filters = {}) => {
     try {
       const { status, priority } = filters;
-      const baseSelect = 'id, user_id, title, description, category, status, priority, ai_analysis, routing_info, created_at, submitted_at';
+      const baseSelect = 'id, reference_id, user_id, title, description, category, status, priority, ai_analysis, routing_info, created_at, submitted_at, department_id, progress_percentage';
 
       const applyFilters = (queryBuilder) => {
         let q = queryBuilder;
+        
+        // Filter by department - this is the key change
+        if (_departmentId) {
+          q = q.eq('department_id', _departmentId);
+        }
+        
         if (status) q = q.eq('status', status);
         if (priority) q = q.eq('priority', priority);
         return q;
@@ -115,6 +121,7 @@ export const adminService = {
 
       const complaintIds = (data || []).map((row) => row.id).filter(Boolean);
       let documentsByComplaint = {};
+      let staffAssignmentsByComplaint = {};
 
       if (complaintIds.length > 0) {
         const { data: documentRows, error: documentsError } = await supabase
@@ -127,12 +134,63 @@ export const adminService = {
         } else {
           documentsByComplaint = groupDocumentsByComplaint(documentRows || []);
         }
+
+        // Fetch staff assignments first (include all statuses, not just active)
+        const { data: assignmentRows, error: assignmentError } = await supabase
+          .from('staff_assignments')
+          .select('complaint_id, staff_id, status, assigned_at')
+          .in('complaint_id', complaintIds)
+          .not('staff_id', 'is', null);
+
+        logger.info(`Fetched ${assignmentRows?.length || 0} assignments for ${complaintIds.length} complaints`);
+
+        if (assignmentError) {
+          logger.warn('Get staff assignments warning:', assignmentError.message);
+        } else if (assignmentRows && assignmentRows.length > 0) {
+          // Get unique staff IDs
+          const staffIds = [...new Set(assignmentRows.map(a => a.staff_id).filter(Boolean))];
+          logger.info(`Found ${staffIds.length} unique staff IDs`);
+          
+          // Fetch staff details
+          if (staffIds.length > 0) {
+            const { data: staffRows, error: staffError } = await supabase
+              .from('department_staff')
+              .select('id, staff_name, position, email')
+              .in('id', staffIds);
+
+            logger.info(`Fetched ${staffRows?.length || 0} staff records`);
+
+            if (staffError) {
+              logger.warn('Get staff details warning:', staffError.message);
+            } else {
+              // Create staff lookup map
+              const staffLookup = {};
+              staffRows?.forEach(staff => {
+                staffLookup[staff.id] = staff;
+              });
+
+              // Map assignments to complaints
+              assignmentRows.forEach((assignment) => {
+                const staff = staffLookup[assignment.staff_id];
+                staffAssignmentsByComplaint[assignment.complaint_id] = {
+                  staff_name: staff?.staff_name || 'Unassigned',
+                  position: staff?.position || '',
+                  email: staff?.email || '',
+                  assigned_at: assignment.assigned_at,
+                };
+              });
+            }
+          }
+        } else {
+          logger.info('No staff assignments found for complaints');
+        }
       }
 
       const complaints = (data || []).map((complaint) => ({
         ...complaint,
         agent_details: extractAgentDetails(complaint),
         documents: documentsByComplaint[complaint.id] || complaint?.ai_analysis?.documents || [],
+        staffAssignment: staffAssignmentsByComplaint[complaint.id] || { staff_name: 'Unassigned', position: '', email: '', assigned_at: null },
       }));
 
       return { success: true, complaints };

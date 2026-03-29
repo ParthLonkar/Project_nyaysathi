@@ -304,7 +304,7 @@ export default function DailyReport({ adminToken }) {
                             {complaint.priority}
                           </span>
                         </td>
-                        <td className="py-2 px-3">{complaint.assignedTo}</td>
+                        <td className="py-2 px-3">{complaint.staffAssignment?.staff_name || complaint.assignedTo || 'Unassigned'}</td>
                       </tr>
                     ))}
                   </tbody>
