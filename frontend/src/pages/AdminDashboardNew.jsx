@@ -359,16 +359,6 @@ export default function AdminDashboardNew() {
                         {new Date(complaint.created_at).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}
                       </td>
                       <td className="px-6 py-5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                            {complaint.staffAssignment?.staff_name?.charAt(0).toUpperCase() || '?'}
-                          </div>
-                          <span className="text-slate-900 dark:text-white font-medium">
-                            {complaint.staffAssignment?.staff_name || 'Unassigned'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(complaint.status)}`}>
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70"></span>
                           {complaint.status || 'new'}
