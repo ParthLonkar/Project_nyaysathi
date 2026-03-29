@@ -237,7 +237,7 @@ export const adminController = {
   getDailyReport: async (req, res) => {
     try {
       const { department_id, id: adminId } = req.user;
-      const { date } = req.query;
+      const { date, reportType } = req.query;
 
       if (!department_id) {
         return res.status(400).json({ error: 'Department ID required', success: false });
@@ -253,9 +253,12 @@ export const adminController = {
         reportDate = new Date(year, month - 1, day);
       }
 
-      logger.info(`Admin ${adminId} requesting daily report for ${reportDate.toISOString()}`);
+      // Check if requested report type is 3-day (default is true for 3-day)
+      const isThreeDayReport = reportType !== 'daily';
 
-      const result = await adminService.getDailyReport(department_id, reportDate);
+      logger.info(`Admin ${adminId} requesting ${isThreeDayReport ? '3-day' : 'daily'} report for ${reportDate.toISOString()}`);
+
+      const result = await adminService.getDailyReport(department_id, reportDate, isThreeDayReport);
 
       if (!result.success) {
         return res.status(500).json(result);
@@ -270,12 +273,12 @@ export const adminController = {
 
   /**
    * Generate and download daily report PDF
-   * GET /admin/daily-report/download?date=YYYY-MM-DD
+   * GET /admin/daily-report/download?date=YYYY-MM-DD&reportType=3day (default) or daily
    */
   downloadDailyReportPDF: async (req, res) => {
     try {
       const { id: adminId, department_id, staff_name, department_name } = req.user;
-      const { date } = req.query;
+      const { date, reportType } = req.query;
 
       if (!department_id) {
         return res.status(400).json({ error: 'Department ID required', success: false });
@@ -291,10 +294,13 @@ export const adminController = {
         reportDate = new Date(year, month - 1, day);
       }
 
-      logger.info(`Admin ${adminId} requesting PDF download for ${reportDate.toISOString()}`);
+      // Check if requested report type is 3-day (default is true for 3-day)
+      const isThreeDayReport = reportType !== 'daily';
+
+      logger.info(`Admin ${adminId} requesting ${isThreeDayReport ? '3-day' : 'daily'} PDF download for ${reportDate.toISOString()}`);
 
       // Get report data
-      const reportResult = await adminService.getDailyReport(department_id, reportDate);
+      const reportResult = await adminService.getDailyReport(department_id, reportDate, isThreeDayReport);
 
       if (!reportResult.success) {
         logger.error('Failed to fetch report data:', reportResult.error);
@@ -313,7 +319,8 @@ export const adminController = {
         logger.info('Generating PDF using backend service...');
         const pdfBuffer = await pdfService.generateDailyReportPDF(reportData);
 
-        const filename = `Daily_Report_${reportDate.toISOString().split('T')[0]}.pdf`;
+        const reportTypeStr = isThreeDayReport ? 'ThreeDay' : 'Daily';
+        const filename = `${reportTypeStr}_Report_${reportDate.toISOString().split('T')[0]}.pdf`;
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

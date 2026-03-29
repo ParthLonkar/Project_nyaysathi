@@ -22,7 +22,7 @@ def build_ai_enrichment(
     legal = legal_override or analyze_legal_intelligence(text=text or "", location=location or "")
     legal = _merge_legal_hints(legal, category_hint=category_hint, priority_hint=priority_hint)
     category = legal.get("category", "general")
-    department = legal.get("department", "Municipal Grievance Cell")
+    department = legal.get("department", "Municipal Corporation")
     priority = legal.get("priority", "medium")
     legal_path = legal.get("legal_path", "manual_review")
 

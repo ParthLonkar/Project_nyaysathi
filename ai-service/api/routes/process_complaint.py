@@ -118,7 +118,7 @@ async def process_complaint(payload: ProcessComplaintRequest):
 
     result = {
         "category": legal_analysis.get("category") or state.category or enrichment.get("category", "general"),
-        "department": legal_analysis.get("department") or enrichment.get("department", "Municipal Grievance Cell"),
+        "department": legal_analysis.get("department") or enrichment.get("department", "Municipal Corporation"),
         "priority": legal_analysis.get("priority") or enrichment.get("priority") or priority_label(float(state.priority_score or 0.0)),
         "legal_path": legal_analysis.get("legal_path") or enrichment.get("legal_path", "manual_review"),
         "legal_strategy": legal_analysis.get("filing_strategy") or enrichment.get("legal_strategy", ""),

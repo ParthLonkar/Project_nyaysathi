@@ -16,7 +16,7 @@ const buildAdminClassification = ({ manualReview, priority }) => {
 };
 
 const buildRoutingInfo = ({ routingDecision = {}, aiResult = {} }) => {
-  const departmentName = aiResult?.department || routingDecision?.departmentName || 'Municipal Grievance Cell';
+  const departmentName = aiResult?.department || routingDecision?.departmentName || 'Municipal Corporation';
 
   return {
     ...routingDecision,

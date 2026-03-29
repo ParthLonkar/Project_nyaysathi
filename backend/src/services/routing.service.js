@@ -2,96 +2,106 @@ import { logger } from '../utils/logger.js';
 
 /**
  * Department Routing Configuration
+ * IMPORTANT: Only these 6 departments exist in the database with admin/staff setup
+ * All complaints must be routed to ONE of these departments only
+ * Database departments: MC, WSD, EB, PWD, PD, CA
  */
 const DEPARTMENTS = {
   water: {
-    name: 'Water Department',
-    code: 'WD',
-    email: 'water@municipal.gov.in',
-    sla: 14,
+    name: 'Water Supply Department',
+    code: 'WSD',
+    email: 'wsd@govt.in',
+    sla: 20,
   },
   electricity: {
     name: 'Electricity Board',
     code: 'EB',
-    email: 'support@electricityboard.gov.in',
-    sla: 10,
+    email: 'eb@govt.in',
+    sla: 15,
   },
   sanitation: {
-    name: 'Municipal Sanitation',
-    code: 'MS',
-    email: 'sanitation@municipal.gov.in',
-    sla: 14,
+    name: 'Municipal Corporation',
+    code: 'MC',
+    email: 'mc@govt.in',
+    sla: 30,
+  },
+  garbage: {
+    name: 'Municipal Corporation',
+    code: 'MC',
+    email: 'mc@govt.in',
+    sla: 30,
   },
   roads: {
-    name: 'Public Works / Roads',
+    name: 'Public Works Department',
     code: 'PWD',
-    email: 'roads@pwd.gov.in',
-    sla: 21,
+    email: 'pwd@govt.in',
+    sla: 25,
   },
   police: {
     name: 'Police Department',
     code: 'PD',
-    email: 'complaints@police.gov.in',
+    email: 'pd@govt.in',
     sla: 7,
-  },
-  education: {
-    name: 'Education Department',
-    code: 'EDU',
-    email: 'grievance@education.gov.in',
-    sla: 30,
-  },
-  revenue: {
-    name: 'Revenue Department',
-    code: 'REV',
-    email: 'revenue@state.gov.in',
-    sla: 30,
-  },
-  social_welfare: {
-    name: 'Social Welfare Department',
-    code: 'SWD',
-    email: 'welfare@state.gov.in',
-    sla: 30,
-  },
-  consumer: {
-    name: 'Consumer Grievance Cell',
-    code: 'CPA',
-    email: 'complaints@consumer.gov.in',
-    sla: 30, // days
-  },
-  employment: {
-    name: 'Ministry of Labour & Employment',
-    code: 'MLE',
-    email: 'grievance@labour.gov.in',
-    sla: 45,
-  },
-  property: {
-    name: 'Revenue Department',
-    code: 'RD',
-    email: 'property@revenue.gov.in',
-    sla: 60,
-  },
-  family: {
-    name: 'Family Court / Civil Court',
-    code: 'FC',
-    email: 'family@courts.gov.in',
-    sla: 90,
   },
   harassment: {
     name: 'Police Department',
     code: 'PD',
-    email: 'complaints@police.gov.in',
+    email: 'pd@govt.in',
     sla: 7,
   },
   corruption: {
-    name: 'Vigilance / Anti-Corruption Cell',
-    code: 'VAC',
-    email: 'vigilance@state.gov.in',
-    sla: 15,
+    name: 'Police Department',
+    code: 'PD',
+    email: 'pd@govt.in',
+    sla: 7,
+  },
+  consumer: {
+    name: 'Consumer Affairs',
+    code: 'CA',
+    email: 'ca@govt.in',
+    sla: 30,
+  },
+  // All other categories default to Municipal Corporation (general civic issues)
+  education: {
+    name: 'Municipal Corporation',
+    code: 'MC',
+    email: 'mc@govt.in',
+    sla: 30,
+  },
+  revenue: {
+    name: 'Municipal Corporation',
+    code: 'MC',
+    email: 'mc@govt.in',
+    sla: 30,
+  },
+  social_welfare: {
+    name: 'Municipal Corporation',
+    code: 'MC',
+    email: 'mc@govt.in',
+    sla: 30,
+  },
+  employment: {
+    name: 'Municipal Corporation',
+    code: 'MC',
+    email: 'mc@govt.in',
+    sla: 30,
+  },
+  property: {
+    name: 'Municipal Corporation',
+    code: 'MC',
+    email: 'mc@govt.in',
+    sla: 30,
+  },
+  family: {
+    name: 'Police Department',
+    code: 'PD',
+    email: 'pd@govt.in',
+    sla: 7,
   },
   general: {
-    name: 'Municipal Grievance Cell',
-    code: 'GCB',
-    email: 'general@municipal.gov.in',
+    name: 'Municipal Corporation',
+    code: 'MC',
+    email: 'mc@govt.in',
     sla: 30,
   },
 };

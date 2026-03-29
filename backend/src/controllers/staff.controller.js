@@ -258,13 +258,19 @@ export const staffController = {
       const { id: staffId } = req.user;
       const { fileType = 'evidence' } = req.body;
 
+      logger.info(`uploadEvidenceFile called: complaintId=${complaintId}, staffId=${staffId}, fileType=${fileType}`);
+
       if (!complaintId) {
+        logger.warn('uploadEvidenceFile: Missing complaint ID');
         return res.status(400).json({ error: 'Complaint ID required' });
       }
 
       if (!req.file) {
+        logger.warn(`uploadEvidenceFile: No file provided for complaint ${complaintId}`);
         return res.status(400).json({ error: 'No file provided' });
       }
+
+      logger.info(`uploadEvidenceFile: File received - name=${req.file.originalname}, size=${req.file.size}, type=${req.file.mimetype}`);
 
       const result = await staffService.uploadEvidenceFile(
         complaintId,
@@ -275,13 +281,15 @@ export const staffController = {
       );
 
       if (!result.success) {
+        logger.error(`uploadEvidenceFile failed for complaint ${complaintId}:`, result.error);
         return res.status(500).json(result);
       }
 
+      logger.info(`uploadEvidenceFile success for complaint ${complaintId}`);
       return res.status(201).json(result);
     } catch (error) {
       logger.error('Upload evidence error:', error);
-      return res.status(500).json({ error: 'Failed to upload evidence' });
+      return res.status(500).json({ error: 'Failed to upload evidence', details: error.message });
     }
   }
 };

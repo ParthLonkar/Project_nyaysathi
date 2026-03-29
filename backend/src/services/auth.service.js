@@ -2,9 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
+import { config } from '../config/env.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+const JWT_SECRET = config.JWT_SECRET || 'your_jwt_secret_key_demo';
 
 /**
  * Admin/Staff Authentication Service

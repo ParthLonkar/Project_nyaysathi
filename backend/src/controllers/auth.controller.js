@@ -1,6 +1,9 @@
 import { authService } from '../services/auth.service.js';
 import { logger } from '../utils/logger.js';
 import jwt from 'jsonwebtoken';
+import { config } from '../config/env.js';
+
+const JWT_SECRET = config.JWT_SECRET || 'your_jwt_secret_key_demo';
 
 /**
  * Admin/Staff Authentication Controller
@@ -135,7 +138,7 @@ export const authController = {
       }
 
       // Generate new token
-      const newToken = jwt.sign(decoded, process.env.JWT_SECRET, { expiresIn: '24h' });
+      const newToken = jwt.sign(decoded, JWT_SECRET, { expiresIn: '24h' });
 
       res.cookie(decoded.type === 'department_admin' ? 'admin_token' : 'staff_token', newToken, {
         httpOnly: true,

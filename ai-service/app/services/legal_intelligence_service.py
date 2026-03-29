@@ -2,20 +2,18 @@ import json
 import re
 from typing import Any, Optional
 
+# IMPORTANT: Only these 6 departments exist in the database with admin/staff
 DEPARTMENT_RULES = [
-    {"category": "water", "department": "Water Department", "keywords": ["water", "pipeline", "no supply", "tap", "sewage", "leakage", "drinking water"]},
+    {"category": "water", "department": "Water Supply Department", "keywords": ["water", "pipeline", "no supply", "tap", "sewage", "leakage", "drinking water"]},
     {"category": "electricity", "department": "Electricity Board", "keywords": ["electricity", "power", "outage", "transformer", "voltage", "meter"]},
-    {"category": "sanitation", "department": "Municipal Sanitation", "keywords": ["garbage", "waste", "sewer", "drain", "sanitation", "trash"]},
-    {"category": "roads", "department": "Public Works / Roads", "keywords": ["road", "pothole", "street", "footpath", "bridge"]},
-    {"category": "police", "department": "Police", "keywords": ["threat", "assault", "violence", "harassment", "stalking", "unsafe", "crime"]},
-    {"category": "education", "department": "Education Department", "keywords": ["school", "teacher", "student", "scholarship", "education", "college"]},
-    {"category": "revenue", "department": "Revenue Department", "keywords": ["land", "property tax", "mutation", "revenue", "patta", "registry"]},
-    {"category": "consumer", "department": "Consumer Grievance Cell", "keywords": ["bill", "overcharge", "refund", "defective", "consumer", "service provider"]},
-    {"category": "social_welfare", "department": "Social Welfare Department", "keywords": ["pension", "ration", "benefit", "widow", "disability", "welfare"]},
+    {"category": "sanitation", "department": "Municipal Corporation", "keywords": ["garbage", "waste", "sewer", "drain", "sanitation", "trash"]},
+    {"category": "roads", "department": "Public Works Department", "keywords": ["road", "pothole", "street", "footpath", "bridge"]},
+    {"category": "police", "department": "Police Department", "keywords": ["threat", "assault", "violence", "harassment", "stalking", "unsafe", "crime"]},
+    {"category": "consumer", "department": "Consumer Affairs", "keywords": ["bill", "overcharge", "refund", "defective", "consumer", "service provider"]},
 ]
 
 FALLBACK_CATEGORY = "general"
-FALLBACK_DEPARTMENT = "Municipal Grievance Cell"
+FALLBACK_DEPARTMENT = "Municipal Corporation"  # All unmapped → Municipal Corporation
 
 CRIME_HIGH_SIGNAL_HINTS = [
     "harassment",
@@ -169,19 +167,19 @@ def _deterministic_analysis(text: str, location: str = "") -> dict[str, Any]:
         legal_path = "complaint_and_rti" if (is_rti_signal or is_repeated_no_action) else "complaint_only"
         return {
             "category": "roads",
-            "department": "Public Works / Roads",
+            "department": "Public Works Department",
             "priority": "high" if (is_roads_danger_signal or is_high_impact) else "medium",
             "legal_path": legal_path,
-            "legal_strategy": _build_legal_strategy(legal_path, "Public Works / Roads"),
+            "legal_strategy": _build_legal_strategy(legal_path, "Public Works Department"),
             "escalation_risk": "high" if (is_roads_danger_signal or is_repeated_no_action) else "medium",
             "manual_review": False,
             "confidence_score": 0.86,
-            "decision_rationale": "Road damage/pothole signal detected; routed to Public Works / Roads with elevated priority.",
+            "decision_rationale": "Road damage/pothole signal detected; routed to Public Works Department with elevated priority.",
         }
 
     if is_public_health_signal:
         inferred_category = "water" if ("water" in text_lower or "sewage" in text_lower) else "sanitation"
-        inferred_department = "Water Department" if inferred_category == "water" else "Municipal Sanitation"
+        inferred_department = "Water Supply Department" if inferred_category == "water" else "Municipal Corporation"
         legal_path = "complaint_and_rti" if (is_rti_signal or is_repeated_no_action) else "complaint_only"
         return {
             "category": inferred_category,

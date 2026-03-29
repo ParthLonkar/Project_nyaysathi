@@ -1,5 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger.js';
+import { config } from '../config/env.js';
+
+const JWT_SECRET = config.JWT_SECRET || 'your_jwt_secret_key_demo';
 
 const isPublicComplaintSubmission = (req) => {
   return req.method === 'POST' && req.path === '/api/complaints';
@@ -18,7 +21,7 @@ export const verifyToken = (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
@@ -35,7 +38,7 @@ export const extractUser = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1] || req.cookies?.admin_token || req.cookies?.staff_token;
 
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      const decoded = jwt.verify(token, JWT_SECRET);
       req.user = decoded;
     }
     next();
@@ -60,7 +63,7 @@ export const authenticate = (req, res, next) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {

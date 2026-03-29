@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api.js';
 
@@ -10,6 +10,7 @@ export default function StaffCaseDetails() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const progressDebounceRef = useRef(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -19,11 +20,19 @@ export default function StaffCaseDetails() {
     file: null
   });
   const [successMessage, setSuccessMessage] = useState('');
+  const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     console.log('StaffCaseDetails ID from params:', id, 'Length:', id?.length);
     fetchComplaintDetails();
+
+    // Cleanup: clear debounce timer on unmount
+    return () => {
+      if (progressDebounceRef.current) {
+        clearTimeout(progressDebounceRef.current);
+      }
+    };
   }, [id]);
 
   const fetchComplaintDetails = async () => {
@@ -31,25 +40,53 @@ export default function StaffCaseDetails() {
       setLoading(true);
       const token = localStorage.getItem('staffToken');
 
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        return;
+      }
+
+      console.log('📤 Fetching complaint details for ID:', id);
+
       const response = await fetch(`${API_BASE_URL}/staff/complaints/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include'
       });
 
+      console.log('📥 Response status:', response.status, response.statusText);
+
       if (response.ok) {
-        const { complaint: data } = await response.json();
-        setComplaint(data);
+        const data = await response.json();
+        console.log('✅ Complaint loaded:', data);
+        setComplaint(data.complaint);
         // Initialize form with current complaint data
         setFormData(prev => ({
           ...prev,
-          status: data.status || 'in_progress',
-          progress: data.progress_percentage || 0
+          status: data.complaint?.status || 'in_progress',
+          progress: data.complaint?.progress_percentage || 0
         }));
       } else {
-        setError('Failed to load complaint details');
+        let errorMsg = 'Failed to load complaint details';
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.error || errorMsg;
+          console.error('❌ API Error:', errorData);
+        } catch (e) {
+          console.error('❌ Could not parse error response, status:', response.status);
+        }
+        
+        if (response.status === 404) {
+          setError('Complaint not found or you are not assigned to it.');
+        } else if (response.status === 401) {
+          setError('Authentication failed. Please log in again.');
+        } else if (response.status === 400) {
+          setError('Invalid complaint ID or you are not assigned to this complaint.');
+        } else {
+          setError(errorMsg);
+        }
       }
     } catch (err) {
-      setError(err.message);
+      console.error('❌ Exception:', err);
+      setError('Error loading complaint: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -81,30 +118,48 @@ export default function StaffCaseDetails() {
     }
   };
 
-  const handleProgressChange = async (newProgress) => {
-    try {
-      const token = localStorage.getItem('staffToken');
-      const response = await fetch(`${API_BASE_URL}/staff/complaints/${id}/progress`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include',
-        body: JSON.stringify({ progressPercentage: newProgress })
-      });
-
-      if (response.ok) {
-        setFormData(prev => ({ ...prev, progress: newProgress }));
-        setSuccessMessage('Progress updated successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-        await fetchComplaintDetails();
-      } else {
-        setError('Failed to update progress');
-      }
-    } catch (err) {
-      setError('Error updating progress: ' + err.message);
+  const handleProgressChange = (newProgress) => {
+    // Update UI immediately for smooth visual feedback
+    setFormData(prev => ({ ...prev, progress: newProgress }));
+    
+    // Clear existing debounce timer
+    if (progressDebounceRef.current) {
+      clearTimeout(progressDebounceRef.current);
     }
+
+    // Debounce the API call - wait 500ms after last change
+    progressDebounceRef.current = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('staffToken');
+        const response = await fetch(`${API_BASE_URL}/staff/complaints/${id}/progress`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'include',
+          body: JSON.stringify({ progressPercentage: newProgress })
+        });
+
+        if (response.ok) {
+          // Update complaint data with new progress
+          setComplaint(prev => ({
+            ...prev,
+            progress_percentage: newProgress
+          }));
+          setSuccessMessage('Progress updated successfully');
+          setTimeout(() => setSuccessMessage(''), 3000);
+        } else {
+          setError('Failed to update progress');
+          // Revert UI on error
+          setFormData(prev => ({ ...prev, progress: complaint?.progress_percentage || 0 }));
+        }
+      } catch (err) {
+        setError('Error updating progress: ' + err.message);
+        // Revert UI on error
+        setFormData(prev => ({ ...prev, progress: complaint?.progress_percentage || 0 }));
+      }
+    }, 500); // Debounce for 500ms
   };
 
   const handleAddNote = async (e) => {
@@ -152,10 +207,14 @@ export default function StaffCaseDetails() {
 
     try {
       setSubmitting(true);
+      setError('');
+      setSuccessMessage('');
       const token = localStorage.getItem('staffToken');
       const fileFormData = new FormData();
       fileFormData.append('file', formData.file);
       fileFormData.append('fileType', 'evidence');
+
+      console.log('Uploading file:', formData.file.name, 'to complaint:', id);
 
       const response = await fetch(`${API_BASE_URL}/staff/complaints/${id}/upload-evidence`, {
         method: 'POST',
@@ -166,22 +225,55 @@ export default function StaffCaseDetails() {
         body: fileFormData
       });
 
+      console.log('Upload response status:', response.status);
+
       if (response.ok) {
-        setSuccessMessage('Evidence file uploaded successfully');
+        const data = await response.json();
+        console.log('Upload successful:', data);
+        setSuccessMessage(`File "${formData.file.name}" uploaded successfully`);
         setFormData(prev => ({ ...prev, file: null }));
         // Reset file input
         const fileInput = document.getElementById('evidence-file');
         if (fileInput) fileInput.value = '';
-        setTimeout(() => setSuccessMessage(''), 3000);
+        setTimeout(() => setSuccessMessage(''), 5000);
         await fetchComplaintDetails();
       } else {
         const errorData = await response.json();
-        setError(errorData.error || 'Failed to upload file');
+        console.error('Upload failed:', errorData);
+        setError(errorData.error || `Failed to upload file (${response.status})`);
       }
     } catch (err) {
+      console.error('Error uploading file:', err);
       setError('Error uploading file: ' + err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      if (droppedFile.size > 15 * 1024 * 1024) {
+        setError('File size must be less than 15MB');
+        return;
+      }
+      setFormData(prev => ({ ...prev, file: droppedFile }));
+      setError('');
     }
   };
 
@@ -214,6 +306,29 @@ export default function StaffCaseDetails() {
 
   return (
     <div className="bg-surface text-on-surface">
+      {/* Error/Success Alert */}
+      {error && (
+        <div className="fixed top-4 right-4 bg-red-50 border border-red-200 rounded-lg p-4 max-w-md z-50 flex gap-3">
+          <span className="material-symbols-outlined text-red-600 flex-shrink-0">error</span>
+          <div>
+            <p className="text-sm font-semibold text-red-900">Error</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+          <button onClick={() => setError('')} className="text-red-400 hover:text-red-600 flex-shrink-0">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+      )}
+      {successMessage && (
+        <div className="fixed top-4 right-4 bg-green-50 border border-green-200 rounded-lg p-4 max-w-md z-50 flex gap-3">
+          <span className="material-symbols-outlined text-green-600 flex-shrink-0">check_circle</span>
+          <div>
+            <p className="text-sm font-semibold text-green-900">Success</p>
+            <p className="text-sm text-green-700">{successMessage}</p>
+          </div>
+        </div>
+      )}
+
       {/* SideNavBar */}
       <aside className="h-screen w-64 fixed left-0 top-0 flex flex-col bg-slate-50 border-r border-slate-200/15 z-50">
         <div className="p-6">
@@ -385,32 +500,116 @@ export default function StaffCaseDetails() {
                   </select>
                 </div>
 
-                {/* Progress Percentage */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-600 mb-2">Progress: {formData.progress}%</label>
-                  <div className="flex items-center gap-4">
+                {/* Progress Percentage Enhanced */}
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="block text-sm font-bold text-slate-700">Work Progress</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={formData.progress}
+                        onChange={(e) => handleProgressChange(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        className="w-16 px-3 py-1.5 border-2 border-primary rounded-lg text-center font-bold text-lg focus:ring-2 focus:ring-primary/20"
+                      />
+                      <span className="text-lg font-bold text-slate-600">%</span>
+                    </div>
+                  </div>
+
+                  {/* Progress Stage Labels */}
+                  <div className="flex justify-between text-xs font-semibold text-slate-500 mb-3">
+                    <span className={formData.progress >= 0 ? 'text-slate-700' : ''}>Start</span>
+                    <span className={formData.progress >= 25 ? 'text-slate-700' : ''}>25%</span>
+                    <span className={formData.progress >= 50 ? 'text-slate-700' : ''}>50%</span>
+                    <span className={formData.progress >= 75 ? 'text-slate-700' : ''}>75%</span>
+                    <span className={formData.progress >= 100 ? 'text-primary font-bold' : ''}>Complete</span>
+                  </div>
+
+                  {/* Enhanced Slider with Progress Gradient */}
+                  <div className="relative mb-2">
+                    <style>{`
+                      input[type="range"]::-webkit-slider-thumb {
+                        appearance: none;
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+                        cursor: pointer;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+                        transition: all 0.2s ease;
+                      }
+                      input[type="range"]::-webkit-slider-thumb:hover {
+                        transform: scale(1.2);
+                        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.6);
+                      }
+                      input[type="range"]::-moz-range-thumb {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+                        cursor: pointer;
+                        border: 3px solid white;
+                        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+                      }
+                    `}</style>
                     <input
                       type="range"
                       min="0"
                       max="100"
                       value={formData.progress}
                       onChange={(e) => handleProgressChange(parseInt(e.target.value))}
-                      className="flex-1 h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-primary"
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={formData.progress}
-                      onChange={(e) => handleProgressChange(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                      className="w-16 px-3 py-2 border border-slate-300 rounded-lg text-center focus:ring-2 focus:ring-primary/20"
+                      className="w-full h-3 rounded-full appearance-none cursor-pointer bg-gradient-to-r from-red-200 via-yellow-200 to-emerald-200"
+                      style={{
+                        background: `linear-gradient(to right, 
+                          rgb(254, 226, 226) 0%, 
+                          rgb(254, 206, 146) 20%,
+                          rgb(253, 224, 71) 40%,
+                          rgb(134, 239, 172) 65%,
+                          rgb(52, 211, 153) 100%)`
+                      }}
                     />
                   </div>
-                  <div className="w-full bg-slate-200 rounded-full h-2 mt-3">
-                    <div 
-                      className="bg-emerald-500 h-2 rounded-full transition-all"
-                      style={{ width: `${formData.progress}%` }}
-                    ></div>
+
+                  {/* Progress Bar with Milestone Markers */}
+                  <div className="relative mb-4">
+                    <div className="w-full bg-gradient-to-r from-slate-100 to-slate-50 rounded-full h-4 overflow-hidden border border-slate-200 shadow-sm">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 shadow-md ${
+                          formData.progress === 0 ? 'bg-slate-300' :
+                          formData.progress < 25 ? 'bg-gradient-to-r from-red-400 to-red-500' :
+                          formData.progress < 50 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
+                          formData.progress < 75 ? 'bg-gradient-to-r from-blue-400 to-blue-500' :
+                          formData.progress < 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' :
+                          'bg-gradient-to-r from-emerald-500 to-green-600'
+                        }`}
+                        style={{ width: `${formData.progress}%`, transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.5s ease' }}
+                      ></div>
+                    </div>
+                    {/* Milestone markers */}
+                    <div className="absolute top-full mt-1 w-full flex justify-between px-0.5 text-[10px] text-slate-400">
+                      <span>•</span>
+                      <span>•</span>
+                      <span>•</span>
+                      <span>•</span>
+                      <span>•</span>
+                    </div>
+                  </div>
+
+                  {/* Progress Status Text */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600">
+                      Status: <span className="font-bold capitalize">
+                        {formData.progress === 0 ? '⏸️ Not Started' :
+                         formData.progress < 25 ? '🔴 Early Stage' :
+                         formData.progress < 50 ? '🟡 Initial Progress' :
+                         formData.progress < 75 ? '🔵 Midway' :
+                         formData.progress < 100 ? '🟢 Advanced' :
+                         '✅ Complete'}
+                      </span>
+                    </span>
+                    <span className="text-primary font-semibold">{formData.progress}% done</span>
                   </div>
                 </div>
               </div>
@@ -440,15 +639,36 @@ export default function StaffCaseDetails() {
               <div>
                 <label className="block text-sm font-bold text-slate-600 mb-2">Upload Evidence/Document</label>
                 <form onSubmit={handleFileUpload} className="space-y-3">
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-primary transition-colors">
+                  <div 
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`border-2 border-dashed rounded-lg p-6 text-center transition-all ${
+                      dragActive 
+                        ? 'border-primary bg-primary-container/10' 
+                        : 'border-slate-300 hover:border-primary hover:bg-slate-50'
+                    }`}
+                  >
                     <input
                       id="evidence-file"
                       type="file"
-                      onChange={(e) => setFormData(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 15 * 1024 * 1024) {
+                            setError('File size must be less than 15MB');
+                            setFormData(prev => ({ ...prev, file: null }));
+                            e.target.value = '';
+                            return;
+                          }
+                          setFormData(prev => ({ ...prev, file }));
+                          setError('');
+                        }
+                      }}
                       className="hidden"
                       accept="image/*,.pdf,.doc,.docx"
                     />
-                    <label htmlFor="evidence-file" className="cursor-pointer">
+                    <label htmlFor="evidence-file" className="cursor-pointer block">
                       <span className="material-symbols-outlined text-4xl text-slate-400 block mb-2">cloud_upload</span>
                       <span className="text-sm font-medium text-slate-600">
                         {formData.file ? formData.file.name : 'Click to upload or drag and drop'}
@@ -456,12 +676,41 @@ export default function StaffCaseDetails() {
                       <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, or images up to 15MB</p>
                     </label>
                   </div>
+                  {formData.file && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-emerald-600">description</span>
+                        <span className="text-sm text-emerald-900 font-medium">{(formData.file.size / 1024 / 1024).toFixed(2)} MB</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, file: null }));
+                          const fileInput = document.getElementById('evidence-file');
+                          if (fileInput) fileInput.value = '';
+                        }}
+                        className="text-xs text-emerald-600 hover:text-emerald-700 px-2 py-1 hover:bg-emerald-100 rounded transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
                   <button
                     type="submit"
                     disabled={submitting || !formData.file}
-                    className="w-full px-6 py-2 bg-secondary text-white rounded-lg hover:bg-secondary-container disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    className="w-full px-6 py-3 bg-secondary text-white rounded-lg hover:bg-secondary-container disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
                   >
-                    {submitting ? 'Uploading...' : 'Upload Evidence'}
+                    {submitting ? (
+                      <>
+                        <span className="animate-spin material-symbols-outlined">hourglass_empty</span>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined">upload</span>
+                        Upload Evidence
+                      </>
+                    )}
                   </button>
                 </form>
               </div>
@@ -570,15 +819,36 @@ export default function StaffCaseDetails() {
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-2">Overall Progress</label>
                   <div className="w-full">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-primary">{complaint?.progress_percentage || 0}%</span>
-                      <span className="text-xs text-slate-500">Complete</span>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-2xl font-bold text-primary">{complaint?.progress_percentage || 0}%</span>
+                      <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
+                        {complaint?.progress_percentage === 0 ? '⏸️ Start' :
+                         complaint?.progress_percentage < 25 ? '🔴 Early' :
+                         complaint?.progress_percentage < 50 ? '🟡 Progress' :
+                         complaint?.progress_percentage < 75 ? '🔵 Midway' :
+                         complaint?.progress_percentage < 100 ? '🟢 Advanced' :
+                         '✅ Done'}
+                      </span>
                     </div>
-                    <div className="w-full bg-slate-200 rounded-full h-3">
+                    <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden border border-slate-200 shadow-sm">
                       <div 
-                        className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-3 rounded-full transition-all shadow-sm"
-                        style={{ width: `${complaint?.progress_percentage || 0}%` }}
+                        className={`h-full rounded-full transition-all shadow-md ${
+                          complaint?.progress_percentage === 0 ? 'bg-slate-400' :
+                          complaint?.progress_percentage < 25 ? 'bg-gradient-to-r from-red-400 to-red-500' :
+                          complaint?.progress_percentage < 50 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
+                          complaint?.progress_percentage < 75 ? 'bg-gradient-to-r from-blue-400 to-blue-500' :
+                          complaint?.progress_percentage < 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' :
+                          'bg-gradient-to-r from-emerald-500 to-green-600'
+                        }`}
+                        style={{ width: `${complaint?.progress_percentage || 0}%`, transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.5s ease' }}
                       ></div>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-slate-400 mt-2 font-semibold">
+                      <span>Start</span>
+                      <span>25%</span>
+                      <span>50%</span>
+                      <span>75%</span>
+                      <span>Done</span>
                     </div>
                   </div>
                 </div>

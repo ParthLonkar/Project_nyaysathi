@@ -72,7 +72,7 @@ Complaint:
 
 
 def _department_line(department: Optional[str]) -> str:
-    return department or "Municipal Grievance Cell"
+    return department or "Municipal Corporation"
 
 
 def generate_complaint_draft(

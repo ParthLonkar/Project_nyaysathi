@@ -41,7 +41,7 @@ const normalizeAIResult = (aiData, sourceText = '', sourceLocation = '') => {
 
   return {
     category,
-    department: aiData?.department || 'Municipal Grievance Cell',
+    department: aiData?.department || 'Municipal Corporation',
     priority,
     legal_strategy: aiData?.legal_strategy || 'Document issue, assign department, and enforce SLA-based follow-up.',
     summary: aiData?.summary || `Complaint received for ${sourceLocation || 'the reported location'}.`,
@@ -68,7 +68,7 @@ const normalizeAIResult = (aiData, sourceText = '', sourceLocation = '') => {
 const buildFallbackAIResult = (sourceText = '', sourceLocation = '', reason = '') => {
   return normalizeAIResult({
     category: 'general',
-    department: 'Municipal Grievance Cell',
+    department: 'Municipal Corporation',
     priority: 'medium',
     legal_strategy: 'Route for manual triage and department assignment.',
     summary: `Fallback AI response used for complaint at ${sourceLocation || 'unknown location'}.`,
@@ -82,7 +82,7 @@ const buildFallbackAIResult = (sourceText = '', sourceLocation = '', reason = ''
     citizen_update: 'Your complaint is submitted and queued for manual review.',
     escalation_risk: 'Escalate if no departmental action is recorded within SLA window.',
     manual_review: true,
-    complaint_draft: `Subject: Complaint regarding civic issue in ${sourceLocation || 'the reported area'}\n\nTo: Municipal Grievance Cell\n\nComplaint Details:\n${sourceText || 'Complaint details not available.'}\n\nRequested Action:\nPlease review and route this complaint manually.`,
+    complaint_draft: `Subject: Complaint regarding civic issue in ${sourceLocation || 'the reported area'}\n\nTo: Municipal Corporation\n\nComplaint Details:\n${sourceText || 'Complaint details not available.'}\n\nRequested Action:\nPlease review and route this complaint manually.`,
     rti_draft: 'To: Public Information Officer\n\nSubject: Request for information under RTI\n\nInformation requested:\nAction taken report and responsible officer details.\n\nApplicant details:\nNot provided',
     document_valid: true,
     document_notes: 'Fallback draft generated due to AI service failure.',

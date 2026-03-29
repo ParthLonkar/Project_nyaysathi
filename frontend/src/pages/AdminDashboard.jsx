@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api.js';
 import DailyReport from '../components/DailyReport.jsx';
 import GeneratedDocumentsPanel from '../components/GeneratedDocumentsPanel.jsx';
+import LegalResearchEnhanced from './LegalResearchEnhanced.jsx';
+import ComplianceEnhanced from './ComplianceEnhanced.jsx';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -15,6 +17,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('complaints');
   const [filterStatus, setFilterStatus] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [complaintsPerPage] = useState(10); // Show 10 complaints per page
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [showDetailView, setShowDetailView] = useState(false);
@@ -59,6 +63,11 @@ export default function AdminDashboard() {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus]);
 
   const fetchDashboardData = async () => {
     try {
@@ -208,6 +217,28 @@ export default function AdminDashboard() {
     ? complaints.filter(c => c.status === filterStatus)
     : complaints;
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredComplaints.length / complaintsPerPage);
+  const startIndex = (currentPage - 1) * complaintsPerPage;
+  const endIndex = startIndex + complaintsPerPage;
+  const paginatedComplaints = filteredComplaints.slice(startIndex, endIndex);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleGoToPage = (page) => {
+    setCurrentPage(page);
+  };
+
   const getStatusColor = (status) => {
     switch(status) {
       case 'assigned': return 'bg-green-100/80 text-green-700';
@@ -326,11 +357,15 @@ export default function AdminDashboard() {
             <span className="material-symbols-outlined text-xl">calendar_today</span>
             <span className="text-sm">Daily Report</span>
           </div>
-          <div className="text-slate-600 hover:bg-slate-100 rounded-lg flex items-center px-4 py-3 space-x-3 cursor-pointer transition-transform duration-200 hover:translate-x-1">
+          <div 
+            onClick={() => setActiveTab('legal-research')}
+            className={`rounded-lg flex items-center px-4 py-3 space-x-3 cursor-pointer transition-all ${activeTab === 'legal-research' ? 'bg-white text-primary shadow-sm font-bold' : 'text-slate-600 hover:bg-slate-100 hover:translate-x-1'}`}>
             <span className="material-symbols-outlined text-xl">gavel</span>
             <span className="text-sm">Legal Research</span>
           </div>
-          <div className="text-slate-600 hover:bg-slate-100 rounded-lg flex items-center px-4 py-3 space-x-3 cursor-pointer transition-transform duration-200 hover:translate-x-1">
+          <div 
+            onClick={() => setActiveTab('compliance')}
+            className={`rounded-lg flex items-center px-4 py-3 space-x-3 cursor-pointer transition-all ${activeTab === 'compliance' ? 'bg-white text-primary shadow-sm font-bold' : 'text-slate-600 hover:bg-slate-100 hover:translate-x-1'}`}>
             <span className="material-symbols-outlined text-xl">verified_user</span>
             <span className="text-sm">Compliance</span>
           </div>
@@ -628,7 +663,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredComplaints.map((complaint, idx) => (
+                      {paginatedComplaints.map((complaint, idx) => (
                         <tr key={complaint.id} className="hover:bg-primary/5 transition-all duration-200 cursor-pointer group" onClick={() => {
                           setSelectedComplaint(complaint);
                           setShowDetailView(true);
@@ -677,13 +712,55 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="p-6 bg-gradient-to-r from-slate-50 to-slate-100/50 border-t-2 border-slate-200 flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-widest">Showing 1-{filteredComplaints.length} of {complaints.length} complaints</p>
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-widest">
+                    Showing {startIndex + 1}-{Math.min(endIndex, filteredComplaints.length)} of {filteredComplaints.length} complaints
+                  </p>
                   <div className="flex items-center space-x-2">
-                    <button className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-300 bg-white hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 shadow-sm">
+                    <button
+                      onClick={handlePrevPage}
+                      disabled={currentPage === 1}
+                      className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-300 bg-white hover:bg-primary hover:text-white hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                    >
                       <span className="material-symbols-outlined text-sm">chevron_left</span>
                     </button>
-                    <button className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary text-white text-xs font-bold shadow-md hover:shadow-lg transition-all duration-200">1</button>
-                    <button className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-300 bg-white hover:bg-primary hover:text-white hover:border-primary transition-all duration-200 shadow-sm">
+                    
+                    {/* Page Numbers */}
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handleGoToPage(pageNum)}
+                            className={`w-9 h-9 flex items-center justify-center rounded-lg text-xs font-bold transition-all duration-200 ${
+                              currentPage === pageNum
+                                ? 'bg-primary text-white shadow-md'
+                                : 'border border-slate-300 bg-white hover:bg-slate-50 hover:border-primary'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                      {totalPages > 5 && currentPage < totalPages - 2 && (
+                        <span className="px-2 text-slate-400">...</span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages}
+                      className="w-9 h-9 flex items-center justify-center rounded-lg border border-slate-300 bg-white hover:bg-primary hover:text-white hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+                    >
                       <span className="material-symbols-outlined text-sm">chevron_right</span>
                     </button>
                   </div>
@@ -792,6 +869,20 @@ export default function AdminDashboard() {
               {activeTab === 'daily-report' && (
                 <div>
                   <DailyReport adminToken={localStorage.getItem('adminToken')} />
+                </div>
+              )}
+
+              {/* Legal Research Tab */}
+              {activeTab === 'legal-research' && (
+                <div>
+                  <LegalResearchEnhanced />
+                </div>
+              )}
+
+              {/* Compliance Tab */}
+              {activeTab === 'compliance' && (
+                <div>
+                  <ComplianceEnhanced />
                 </div>
               )}
             </>

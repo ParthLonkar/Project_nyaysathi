@@ -30,16 +30,34 @@ def detect_category(text: str, category_hint: Optional[str] = None) -> str:
 
 
 def infer_department(category: str) -> str:
+    """Map category to actual department in database.
+    
+    IMPORTANT: Only these 6 departments exist in the database:
+    - Water Supply Department (WSD)
+    - Municipal Corporation (MC)
+    - Electricity Board (EB)
+    - Public Works Department (PWD)
+    - Police Department (PD)
+    - Consumer Affairs (CA)
+    """
     mapping = {
-        "water": "Water Department",
-        "sanitation": "Sanitation Department",
+        "water": "Water Supply Department",
+        "sanitation": "Municipal Corporation",
+        "garbage": "Municipal Corporation",
         "roads": "Public Works Department",
         "electricity": "Electricity Board",
         "harassment": "Police Department",
-        "corruption": "Vigilance Department",
-        "general": "Municipal Grievance Cell",
+        "corruption": "Police Department",
+        "consumer": "Consumer Affairs",
+        "property": "Municipal Corporation",
+        "revenue": "Municipal Corporation",
+        "education": "Municipal Corporation",
+        "social_welfare": "Municipal Corporation",
+        "employment": "Municipal Corporation",
+        "family": "Police Department",
+        "general": "Municipal Corporation",
     }
-    return mapping.get(category, "Municipal Grievance Cell")
+    return mapping.get(category, "Municipal Corporation")
 
 
 def infer_location(text: str) -> Optional[str]:

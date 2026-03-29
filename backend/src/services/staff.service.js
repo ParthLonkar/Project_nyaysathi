@@ -368,27 +368,40 @@ export const staffService = {
    */
   uploadEvidenceFile: async (complaintId, fileBuffer, fileName, fileType = 'evidence', staffId = null) => {
     try {
+      logger.info(`uploadEvidenceFile start: complaintId=${complaintId}, fileName=${fileName}, fileType=${fileType}, bufferSize=${fileBuffer.length}`);
+
       // Generate unique file path
       const timestamp = Date.now();
       const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
       const storagePath = `complaints/${complaintId}/evidence/${timestamp}-${safeFileName}`;
 
-      // Upload to Supabase storage
-      const { data: uploadData, error: uploadError } = await supabase
+      logger.info(`Uploading file to storage: ${storagePath}`);
+
+      // Upload to Supabase storage using admin client to bypass RLS
+      const storageClient = supabaseAdmin || supabase;
+      const { data: uploadData, error: uploadError } = await storageClient
         .storage
         .from('complaint-documents')
-        .upload(storagePath, fileBuffer);
+        .upload(storagePath, fileBuffer, {
+          contentType: 'application/octet-stream',
+          upsert: false
+        });
 
       if (uploadError) {
         logger.error('File upload error:', uploadError);
-        return { success: false, error: 'Failed to upload file' };
+        return { success: false, error: `File upload failed: ${uploadError.message}` };
       }
 
+      logger.info(`File uploaded to storage, getting public URL`);
+
       // Get public URL
-      const { data: publicUrlData } = supabase
+      const { data: publicUrlData } = storageClient
         .storage
         .from('complaint-documents')
         .getPublicUrl(storagePath);
+
+      const publicUrl = publicUrlData?.publicUrl;
+      logger.info(`Public URL obtained: ${publicUrl}`);
 
       // Create complaint_documents record using admin client to bypass RLS
       const writeClient = supabaseAdmin || supabase;
@@ -397,13 +410,15 @@ export const staffService = {
         document_type: fileType,
         file_name: fileName,
         storage_path: storagePath,
-        public_url: publicUrlData.publicUrl
+        public_url: publicUrl
       };
       
       // Include staff_id if provided (for tracking)
       if (staffId) {
         docPayload.staff_id = staffId;
       }
+
+      logger.info(`Inserting document record:`, JSON.stringify(docPayload));
 
       const { data: docRecord, error: dbError } = await writeClient
         .from('complaint_documents')
@@ -412,15 +427,15 @@ export const staffService = {
         .single();
 
       if (dbError) {
-        logger.error('Create document record error:', dbError);
-        return { success: false, error: 'Failed to save document record' };
+        logger.error('Create document record error:', dbError.message);
+        return { success: false, error: `Failed to save document record: ${dbError.message}` };
       }
 
-      logger.info(`Evidence file uploaded for complaint ${complaintId}: ${fileName}`);
+      logger.info(`Evidence file uploaded successfully for complaint ${complaintId}: ${fileName}`);
       return { success: true, document: docRecord };
     } catch (error) {
       logger.error('Upload evidence error:', error);
-      return { success: false, error: 'Failed to upload evidence' };
+      return { success: false, error: `Failed to upload evidence: ${error.message}` };
     }
   }
 };

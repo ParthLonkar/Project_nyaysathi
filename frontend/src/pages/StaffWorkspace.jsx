@@ -31,25 +31,47 @@ export default function StaffWorkspace() {
       setLoading(true);
       const token = localStorage.getItem('staffToken');
 
+      if (!token) {
+        setError('Staff token not found. Please log in again.');
+        return;
+      }
+
+      // Fetch complaints
       const complaintsRes = await fetch(`${API_BASE_URL}/staff/complaints`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include'
       });
-      if (complaintsRes.ok) {
-        const { complaints: data } = await complaintsRes.json();
-        setComplaints(data || []);
+      
+      if (!complaintsRes.ok) {
+        console.error('Complaints fetch failed:', complaintsRes.status, complaintsRes.statusText);
+        let errorMsg = `Failed to load complaints (${complaintsRes.status})`;
+        try {
+          const errorData = await complaintsRes.json();
+          errorMsg = errorData.error || errorMsg;
+        } catch (e) {
+          // Could not parse error response
+        }
+        setError(errorMsg);
+      } else {
+        const data = await complaintsRes.json();
+        setComplaints(data.complaints || []);
       }
 
+      // Fetch dashboard
       const dashboardRes = await fetch(`${API_BASE_URL}/staff/dashboard`, {
         headers: { Authorization: `Bearer ${token}` },
         credentials: 'include'
       });
-      if (dashboardRes.ok) {
-        const { summary } = await dashboardRes.json();
-        setDashboard(summary);
+      
+      if (!dashboardRes.ok) {
+        console.error('Dashboard fetch failed:', dashboardRes.status, dashboardRes.statusText);
+      } else {
+        const data = await dashboardRes.json();
+        setDashboard(data.summary);
       }
     } catch (err) {
-      setError(err.message);
+      console.error('Fetch complaints error:', err);
+      setError(err.message || 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -68,9 +90,11 @@ export default function StaffWorkspace() {
     return (complaints || [])
       .filter(Boolean)
       .map((item) => {
-        const complaint = item?.complaints || item || {};
+        // item structure from API: { id, complaint_id, status, complaints: {...} }
+        const complaint = item?.complaints || {};
         return {
-          id: complaint.id || item.id || crypto.randomUUID?.() || Math.random().toString(36).slice(2),
+          id: item.id, // The staff_assignments ID (for linking)
+          complaint_id: item.complaint_id || complaint.id, // The actual complaint UUID
           reference_id: complaint.reference_id || complaint.tracking_id || complaint.id || 'N/A',
           title: complaint.title || 'Untitled Complaint',
           category: complaint.category || 'General',
@@ -131,7 +155,7 @@ export default function StaffWorkspace() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/staff/profile')}
+              onClick={() => navigate('/staff/task')}
               className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-emerald-50/50 hover:text-emerald-800 transition-all duration-300 rounded-lg group text-left"
             >
               <span className="material-symbols-outlined text-slate-400 group-hover:text-emerald-700">description</span>
@@ -139,10 +163,10 @@ export default function StaffWorkspace() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/staff/profile')}
-              className="flex items-center gap-3 px-4 py-3 text-slate-600 hover:bg-emerald-50/50 hover:text-emerald-800 transition-all duration-300 rounded-lg group text-left"
+              disabled
+              className="flex items-center gap-3 px-4 py-3 text-slate-400 cursor-not-allowed opacity-50"
             >
-              <span className="material-symbols-outlined text-slate-400 group-hover:text-emerald-700">settings</span>
+              <span className="material-symbols-outlined text-slate-300">settings</span>
               <span className="font-body text-sm font-medium">Settings</span>
             </button>
           </nav>
@@ -206,6 +230,23 @@ export default function StaffWorkspace() {
               <h2 className="font-headline text-5xl font-bold text-primary tracking-tight mb-2">Welcome back, {staffName.split(' ')[0]}</h2>
               <p className="text-secondary font-body max-w-2xl">Stay on top of your assigned cases and manage your legal workflow efficiently.</p>
             </div>
+
+            {/* Error Alert */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
+                <span className="material-symbols-outlined text-red-600" style={{ fontVariationSettings: "'FILL' 1" }}>error</span>
+                <div>
+                  <p className="text-sm font-medium text-red-800">⚠️ Error Loading Data</p>
+                  <p className="text-xs text-red-700 mt-1">{error}</p>
+                  <button 
+                    onClick={fetchComplaintsData}
+                    className="mt-2 text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
               <div className="bg-surface-container-lowest p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow group">
@@ -346,7 +387,10 @@ export default function StaffWorkspace() {
                               </span>
                             </td>
                             <td className="py-4 pr-4 text-right align-middle">
-                              <button className="text-xs font-bold text-primary-container px-4 py-2 bg-secondary-fixed rounded-lg hover:bg-primary hover:text-white transition-all">
+                              <button 
+                                onClick={() => navigate(`/staff/case/${row.complaint_id}`)}
+                                className="text-xs font-bold text-primary-container px-4 py-2 bg-secondary-fixed rounded-lg hover:bg-primary hover:text-white transition-all"
+                              >
                                 View
                               </button>
                             </td>

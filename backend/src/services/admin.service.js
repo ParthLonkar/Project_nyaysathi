@@ -492,30 +492,50 @@ export const adminService = {
     }
   },
 
-  getDailyReport: async (departmentId, reportDate) => {
+  getDailyReport: async (departmentId, reportDate, isThreeDayReport = true) => {
     try {
-      logger.info(`Generating daily report for date: ${reportDate}`);
+      logger.info(`Generating ${isThreeDayReport ? '3-day' : 'daily'} report for department: ${departmentId}, date: ${reportDate}`);
 
-      // Parse the date to get start and end of day
-      const startOfDay = new Date(reportDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(reportDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // For 3-day report: get last 3 days, for daily: get single day
+      let startOfPeriod = new Date(reportDate);
+      startOfPeriod.setHours(0, 0, 0, 0);
+      let endOfPeriod = new Date(reportDate);
+      endOfPeriod.setHours(23, 59, 59, 999);
 
-      const startIso = startOfDay.toISOString();
-      const endIso = endOfDay.toISOString();
+      if (isThreeDayReport) {
+        // Go back 2 more days for 3-day report
+        startOfPeriod = new Date(reportDate);
+        startOfPeriod.setDate(startOfPeriod.getDate() - 2);
+        startOfPeriod.setHours(0, 0, 0, 0);
+      }
 
-      // Fetch complaints with error handling
+      const startIso = startOfPeriod.toISOString();
+      const endIso = endOfPeriod.toISOString();
+
+      // Fetch complaints with error handling using admin client to bypass RLS
       let allComplaints = [];
       
       try {
-        const { data, error } = await supabase
+        // Use admin client for broader query access (bypass RLS)
+        const adminClient = writeClient();
+        const usingServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+        logger.info(`Fetching complaints using ${usingServiceRole ? 'service role' : 'anon'} client for department: ${departmentId}`);
+        
+        let query = adminClient
           .from('complaints')
-          .select('id, title, description, category, status, priority, created_at, updated_at, resolved_at, assigned_staff_id, ai_analysis')
+          .select('id, reference_id, title, description, category, status, priority, created_at, updated_at, resolved_at, assigned_staff_id, ai_analysis, department_id')
           .order('created_at', { ascending: false });
+        
+        // Filter by department_id if provided
+        if (departmentId) {
+          query = query.eq('department_id', departmentId);
+        }
+        
+        const { data, error } = await query;
 
         if (!error && data) {
           allComplaints = data;
+          logger.info(`Fetched ${allComplaints.length} total complaints for department ${departmentId}`);
         } else {
           logger.warn('Complaints fetch error:', error?.message);
           allComplaints = [];
@@ -525,25 +545,36 @@ export const adminService = {
         allComplaints = [];
       }
 
-      // Filter complaints for the specific day
-      const dailyComplaints = (allComplaints || []).filter(complaint => {
+      // Filter complaints for the specific period
+      const periodComplaints = (allComplaints || []).filter(complaint => {
         try {
           if (!complaint.created_at) return false;
           const complaintDate = new Date(complaint.created_at);
-          return complaintDate >= startOfDay && complaintDate <= endOfDay;
+          return complaintDate >= startOfPeriod && complaintDate <= endOfPeriod;
         } catch (e) {
+          logger.warn('Error filtering complaint date:', e.message);
           return false;
         }
       });
 
-      logger.info(`Found ${dailyComplaints.length} complaints for the day`);
+      logger.info(`Found ${periodComplaints.length} complaints for the period (${startOfPeriod.toDateString()} to ${endOfPeriod.toDateString()})`);
 
-      // Build staff map (try to fetch but don't fail if unavailable)
+      // Build staff map (try to fetch but don't fail if unavailable) - use admin client for broader access
       const staffMap = {};
       try {
-        const { data: staffList, error: staffError } = await supabase
+        const adminClient = writeClient();
+        let staffQuery = adminClient
           .from('department_staff')
-          .select('id, staff_name, position, email, phone');
+          .select('id, staff_name, position, email, phone, is_active');
+        
+        // Filter by department if provided for more accuracy
+        if (departmentId) {
+          staffQuery = staffQuery.eq('department_id', departmentId);
+        }
+        
+        const { data: staffList, error: staffError } = await staffQuery;
+
+        logger.info(`Staff fetch result - errors: ${staffError ? staffError.message : 'none'}, count: ${staffList?.length || 0}`);
 
         if (!staffError && staffList && Array.isArray(staffList)) {
           staffList.forEach(staff => {
@@ -551,9 +582,12 @@ export const adminService = {
               staffMap[staff.id] = staff;
             }
           });
+          logger.info(`Built staff map with ${Object.keys(staffMap).length} staff members`);
+        } else if (staffError) {
+          logger.warn('Staff fetch error (non-blocking):', staffError.message);
         }
       } catch (err) {
-        logger.warn('Staff fetch failed (non-blocking):', err.message);
+        logger.warn('Staff fetch exception (non-blocking):', err.message);
         // Continue without staff data
       }
 
@@ -565,8 +599,9 @@ export const adminService = {
       const escalatedComplaints = [];
       let totalResolutionTime = 0;
       let resolvedCount = 0;
+      const dailyBreakdown = {};
 
-      dailyComplaints.forEach(complaint => {
+      periodComplaints.forEach(complaint => {
         try {
           // Status breakdown
           const status = String(complaint.status || 'new').toLowerCase();
@@ -579,6 +614,12 @@ export const adminService = {
           // Category breakdown
           const category = String(complaint.category || 'uncategorized');
           categoryBreakdown[category] = (categoryBreakdown[category] || 0) + 1;
+
+          // Daily breakdown for 3-day reports
+          if (isThreeDayReport) {
+            const day = new Date(complaint.created_at).toISOString().split('T')[0];
+            dailyBreakdown[day] = (dailyBreakdown[day] || 0) + 1;
+          }
 
           // Staff assignment
           if (complaint.assigned_staff_id) {
@@ -608,31 +649,39 @@ export const adminService = {
 
       const avgResolutionTime = resolvedCount > 0 ? parseFloat((totalResolutionTime / resolvedCount).toFixed(2)) : 0;
 
-      const reportDateFormatted = reportDate.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
+      logger.info(`Report metrics - status: ${JSON.stringify(statusBreakdown)}, severity: ${JSON.stringify(severityBreakdown)}, resolved: ${resolvedCount}, avg resolution: ${avgResolutionTime} days`);
+
+      const reportDateFormatted = isThreeDayReport 
+        ? `Last 3 Days (${startOfPeriod.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${reportDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`
+        : reportDate.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
 
       const report = {
         success: true,
         report: {
           reportDate: reportDateFormatted,
           reportDateISO: reportDate.toISOString().split('T')[0],
-          totalComplaintsReceived: dailyComplaints.length,
+          periodStartISO: startOfPeriod.toISOString().split('T')[0],
+          isThreeDayReport,
+          totalComplaintsReceived: periodComplaints.length,
           statusBreakdown,
           severityBreakdown,
           categoryBreakdown,
+          dailyBreakdown: isThreeDayReport ? dailyBreakdown : undefined,
           staffAssignments: assignedToStaff,
           staffDetails: staffMap,
           escalatedComplaints: escalatedComplaints.slice(0, 20),
           kpis: {
             averageResolutionTime: avgResolutionTime,
             totalResolved: resolvedCount,
-            slaComplianceRate: dailyComplaints.length > 0 ? Math.round((resolvedCount / dailyComplaints.length) * 100) : 0,
+            slaComplianceRate: periodComplaints.length > 0 ? Math.round((resolvedCount / periodComplaints.length) * 100) : 0,
+            complaintVolumePerDay: periodComplaints.length > 0 ? parseFloat((periodComplaints.length / (isThreeDayReport ? 3 : 1)).toFixed(1)) : 0,
           },
-          detailedComplaints: dailyComplaints.map(c => ({
+          detailedComplaints: periodComplaints.map(c => ({
             id: c.id || 'N/A',
             title: c.title || 'No Title',
             description: String(c.description || 'N/A').substring(0, 100),
@@ -647,7 +696,7 @@ export const adminService = {
         },
       };
 
-      logger.info('Daily report generated successfully');
+      logger.info(`${isThreeDayReport ? '3-day' : 'Daily'} report generated successfully`);
       return report;
     } catch (error) {
       logger.error('getDailyReport error:', error);
