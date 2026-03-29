@@ -637,7 +637,7 @@ export default function AdminDashboard() {
                           </td>
                           <td className="px-6 py-4">
                             <p className="text-sm font-bold text-on-surface">{complaint.title}</p>
-                            <p className="text-xs text-slate-500">{complaint.id}</p>
+                            <p className="text-xs text-slate-500">{complaint.reference_id}</p>
                           </td>
                           <td className="px-6 py-4 text-xs text-slate-600">{complaint.category}</td>
                           <td className="px-6 py-4">

@@ -103,6 +103,7 @@ export default function AdminDashboardNew() {
       return complaint.assigned_to === admin?.id;
     }
     return searchTerm === '' || 
+           complaint.reference_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            complaint.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            complaint.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
            complaint.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -340,7 +341,7 @@ export default function AdminDashboardNew() {
                         />
                       </td>
                       <td className="px-6 py-5 font-bold text-indigo-600 dark:text-indigo-400">
-                        #{complaint.id}
+                        #{complaint.reference_id}
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
